@@ -1,14 +1,13 @@
-import Modern from "./ModernSlaveryPolicy";
+import AForm from "./AForm";
 
 
 
 export default function page(){
 
-
     return(
         <>
         
-<Modern/>
+      <AForm/>
         </>
     );
 }

@@ -25,21 +25,21 @@ const linkColumns = [
 const offices = [
   {
     city: "Head Office",
-    address: "35 Berkeley Square, Mayfair, London W1J 5BF",
-    phone: "Head Office +44 (0)2071 646 399",
+    address: "167-169 Great Portland Street, 5th Floor, London W1W 5PF",
+    phone: "+44 020 7164 6399",
     email: "info@zoikomobile.co.uk",
   },
   {
     city: "Glasgow",
-    address: "Suite 2/3, 2nd Floor 48 West George Street, Glasgow G2 1BP",
-    phone: "Glasgow +44 141 530 1560",
-    email: "glasgow@zoikomobile.co.uk",
+    address: "Suite 2/3, 48 West George Street, Glasgow G2 1BP",
+    phone: "+44 020 7164 6399",
+    email: "info@zoikomobile.co.uk",
   },
   {
     city: "Cardiff",
-    address: "Portland House, 113-116 Bute Street, Cardiff CF10 5EQ",
-    phone: "Cardiff +44 292 000 1374",
-    email: "cardiff@zoikomobile.co.uk",
+    address: "Portland House, 113-116 Blue Street, Cardiff CF10 5EQ",
+    phone: "+44 020 7164 6399",
+    email: "info@zoikomobile.co.uk",
   },
 ];
 
