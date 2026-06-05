@@ -1,5 +1,4 @@
-import AForm from "./AForm";
-
+import Activateform from "./Activateform";
 
 
 export default function page(){
@@ -7,7 +6,7 @@ export default function page(){
     return(
         <>
         
-      <AForm/>
+      <Activateform/>
         </>
     );
 }
