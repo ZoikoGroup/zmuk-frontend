@@ -132,7 +132,7 @@ function NumberBadge({ num }: { num: number }) {
 
 export default function TermsAndConditions() {
   return (
-    <main className="bg-gray-50 font-sans">
+    <main className="bg-gray-50 font-sans dark:bg-gray-900">
       {/* ─── Hero ─── */}
       <section className="bg-gradient-to-r from-[#17a06a] to-[#0e8f74] px-4 py-14 text-center text-white sm:px-6 md:px-8">
         <p className="text-xs text-white/80">
@@ -146,12 +146,12 @@ export default function TermsAndConditions() {
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:px-8 lg:grid-cols-[260px_minmax(0,1fr)]">
         {/* Quick navigation */}
         <aside className="lg:sticky lg:top-24 lg:self-start">
-          <nav className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Quick Navigation</p>
+          <nav className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Quick Navigation</p>
             <ul className="mt-4 space-y-2.5">
               {sections.map((s) => (
                 <li key={s.id}>
-                  <a href={`#${s.id}`} className="block text-sm text-gray-600 transition-colors hover:text-[#0e8f74]">
+                  <a href={`#${s.id}`} className="block text-sm text-gray-600 transition-colors hover:text-[#0e8f74] dark:text-gray-300">
                     {s.navLabel}
                   </a>
                 </li>
@@ -166,23 +166,23 @@ export default function TermsAndConditions() {
             <section
               key={s.id}
               id={s.id}
-              className="scroll-mt-24 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 sm:p-8"
+              className="scroll-mt-24 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 sm:p-8 dark:bg-gray-800 dark:ring-gray-700"
             >
               <div className="flex items-center gap-3">
                 <NumberBadge num={s.num} />
-                <h2 className="text-lg font-bold text-gray-800 sm:text-xl">{s.title}</h2>
+                <h2 className="text-lg font-bold text-gray-800 sm:text-xl dark:text-white">{s.title}</h2>
               </div>
 
               {s.intro && (
-                <p className="mt-4 text-sm leading-relaxed text-gray-500">{s.intro}</p>
+                <p className="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-300">{s.intro}</p>
               )}
 
               {s.subsections && (
                 <div className="mt-5 space-y-5">
                   {s.subsections.map((sub) => (
                     <div key={sub.label} className="border-l-4 border-[#1f9d6b] pl-4">
-                      <h3 className="text-sm font-semibold text-gray-700">{sub.label}</h3>
-                      <p className="mt-1.5 text-sm leading-relaxed text-gray-500">{sub.text}</p>
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{sub.label}</h3>
+                      <p className="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{sub.text}</p>
                     </div>
                   ))}
                 </div>
@@ -190,17 +190,17 @@ export default function TermsAndConditions() {
 
               {/* Contact box for section 8 */}
               {s.id === "contact-information" && (
-                <div className="mt-5 rounded-xl bg-gray-50 p-5 ring-1 ring-gray-100">
-                  <p className="font-bold text-gray-800">Zoiko Mobile</p>
-                  <p className="mt-2 text-sm text-gray-500">Berkeley Suite, 35 Berkeley Square,</p>
-                  <p className="text-sm text-gray-500">Mayfair, London W1J 5BF</p>
-                  <p className="mt-2 text-sm text-gray-600">
+                <div className="mt-5 rounded-xl bg-gray-50 p-5 ring-1 ring-gray-100 dark:bg-gray-900 dark:ring-gray-700">
+                  <p className="font-bold text-gray-800 dark:text-white">Zoiko Mobile</p>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Berkeley Suite, 35 Berkeley Square,</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Mayfair, London W1J 5BF</p>
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
                     <span className="font-semibold">Email:</span>{" "}
                     <a href="mailto:info@zoikomobile.co.uk" className="text-[#e6007e] hover:underline">
                       info@zoikomobile.co.uk
                     </a>
                   </p>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                     <span className="font-semibold">Telephone:</span> +44 7071 646 399
                   </p>
                 </div>
@@ -209,8 +209,8 @@ export default function TermsAndConditions() {
           ))}
 
           {/* Closing note */}
-          <div className="rounded-2xl bg-gradient-to-br from-[#eef0fb] to-[#f3eefb] p-8 text-center ring-1 ring-gray-100">
-            <p className="mx-auto max-w-xl text-sm leading-relaxed text-gray-600">
+          <div className="rounded-2xl bg-gradient-to-br from-[#eef0fb] to-[#f3eefb] p-8 text-center ring-1 ring-gray-100 dark:from-gray-800 dark:to-gray-800 dark:ring-gray-700">
+            <p className="mx-auto max-w-xl text-sm leading-relaxed text-gray-600 dark:text-gray-300">
               By using Zoiko Mobile&rsquo;s website, you agree to these Terms and Conditions. Thank you
               for choosing Zoiko Mobile as your online destination. We value your compliance with
               these guidelines to ensure a secure and enjoyable online experience.

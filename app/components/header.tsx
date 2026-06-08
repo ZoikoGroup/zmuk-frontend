@@ -10,7 +10,7 @@ const topLinks = [
   { label: "Activate Your SIM", href: "/activate-your-sim", highlight: true },
   { label: "Top Up", href: "/top-up" },
   { label: "Switch & Save", href: "/switch-save" },
-  { label: "Contact Us", href: "/contact" },
+  { label: "Contact Us", href: "/contact-us" },
   { label: "Support", href: "/support" },
   { label: "International Calls", href: "/international-calls" },
 ];
