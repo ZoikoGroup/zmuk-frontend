@@ -64,7 +64,7 @@ function sectionCx(extra = "") {
 
 // ─── PAGE ─────────────────────────────────────────────────────────────────────
 
-export default function Modern() {
+export default function modern() {
   return (
     <main className="bg-gray-50 font-sans">
       {/* ─── Hero ─── */}

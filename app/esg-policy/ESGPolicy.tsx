@@ -240,4 +240,4 @@ function ESGPolicy() {
 
 // Exported both ways so either default or named import works.
 export default ESGPolicy;
-export { ESGPolicy };
+export { ESGPolicy }; 

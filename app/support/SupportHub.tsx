@@ -20,11 +20,11 @@ const SearchIcon = () => (
 type Card = { title: string; desc: string; href: string };
 
 const customerSupport: Card[] = [
-  { title: "Help & Support", desc: "Browse our comprehensive help center with answers to common questions", href: "" },
-  { title: "Reasons to Love Zoiko", desc: "Discover what makes Zoiko Mobile special and why customers choose us", href: "" },
-  { title: "Check Network Coverage", desc: "Find out about network coverage in your area with our coverage checker", href: "" },
-  { title: "FAQs", desc: "Quick answers to the most frequently asked questions", href: "" },
-  { title: "How to Activate SIM Cards", desc: "Step-by-step guide to activate your new Zoiko Mobile SIM card", href: "" },
+  { title: "Help & Support", desc: "Browse our comprehensive help center with answers to common questions", href: "/help-support" },
+  { title: "Reasons to Love Zoiko", desc: "Discover what makes Zoiko Mobile special and why customers choose us", href: "/reasons-to-love-zoiko" },
+  { title: "Check Network Coverage", desc: "Find out about network coverage in your area with our coverage checker", href: "https://ee.co.uk/help/mobile-coverage-checker" },
+  { title: "FAQs", desc: "Quick answers to the most frequently asked questions", href: "/faqs" },
+  { title: "How to Activate SIM Cards", desc: "Step-by-step guide to activate your new Zoiko Mobile SIM card", href: "/how-to-activate-sim-cards" },
 ];
 
 const getStarted: Card[] = [

@@ -16,7 +16,7 @@ const linkColumns: { title: string; links: FooterLink[] }[] = [
       { label: "Business SIM Deals", href: "" },
       { label: "Data Only SIMs", href: "" },
       { label: "30-Day Plans", href: "" },
-      { label: "Coverage Checker", href: "" },
+      { label: "Coverage Checker", href: " https://ee.co.uk/help/mobile-coverage-checker " },
     ],
   },
   {
