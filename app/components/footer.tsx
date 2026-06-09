@@ -10,13 +10,15 @@ type FooterLink = { label: string; href: string };
 
 const linkColumns: { title: string; links: FooterLink[] }[] = [
   {
-    title: "Zoiko Mobile",
+    title: "Zoiko Mobile UK",
     links: [
       { label: "Zoiko Mobile Plans", href: "" },
       { label: "Business SIM Deals", href: "" },
       { label: "Data Only SIMs", href: "" },
       { label: "30-Day Plans", href: "" },
       { label: "Coverage Checker", href: " https://ee.co.uk/help/mobile-coverage-checker " },
+      { label: "Zoiko Broadband", href: " https://zoikobroadband.com/" },
+      { label: "Zoiko Orbit", href: " https://zoikoorbit.com/" },
     ],
   },
   {
@@ -24,9 +26,9 @@ const linkColumns: { title: string; links: FooterLink[] }[] = [
     links: [
       { label: "Roaming and Overage", href: "/roaming-and-coverage" },
       { label: "Zero Cost SMS", href: "" },
-      { label: "Discounted Rates", href: "" },
+      { label: "Discounted Rates", href: "/discounted-rates" },
       { label: "Refer A Friend", href: "" },
-      { label: "Zoiko Programmes", href: "" },
+     
     ],
   },
   {
