@@ -8,11 +8,11 @@ import { Menu, X, ChevronDown, Search, ShoppingCart } from "lucide-react";
 // Top utility bar links
 const topLinks = [
   { label: "Activate Your SIM", href: "/activate-your-sim", highlight: true },
-  { label: "Top Up", href: "/top-up" },
+  { label: "Top Up", href: "/recharge" },
   { label: "Switch & Save", href: "/switch-save" },
   { label: "Contact Us", href: "/contact-us" },
   { label: "Support", href: "/support" },
-  { label: "International Calls", href: "/international-calls" },
+  { label: "International Calls", href: "/international-calling" },
 ];
 
 // Main nav. `dropdown` is optional. (Zoiko Plans sub-links are placeholders — edit to taste.)
@@ -29,7 +29,7 @@ const navLinks = [
   },
   { label: "Business Deals", href: "/business-deals" },
   { label: "Devices", href: "/devices" },
-  { label: "Animals & Music", href: "/animals-music" },
+  { label: "Animals & Music", href: "/animals-and-music" },
   { label: "About Us", href: "/about-us" },
 ];
 
