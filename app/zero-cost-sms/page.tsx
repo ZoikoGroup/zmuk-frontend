@@ -1,14 +1,12 @@
-import Modern from "./ModernSlaveryPolicy";
-
+import Zerocostsms from "./Zerocostsms";
 
 
 export default function page(){
-
-
     return(
         <>
         
-<Modern/>
+        <Zerocostsms/>
+        
         </>
     );
 }

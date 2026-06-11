@@ -1,6 +1,4 @@
-import Modern from "./ModernSlaveryPolicy";
-
-
+import Aboutus from "./Aboutus";
 
 export default function page(){
 
@@ -8,7 +6,8 @@ export default function page(){
     return(
         <>
         
-<Modern/>
+        <Aboutus/>
+        
         </>
     );
 }

@@ -1,5 +1,4 @@
-import Modern from "./ModernSlaveryPolicy";
-
+import Roaming from "./Roaming";
 
 
 export default function page(){
@@ -7,8 +6,7 @@ export default function page(){
 
     return(
         <>
-        
-<Modern/>
+        <Roaming/>
         </>
     );
 }

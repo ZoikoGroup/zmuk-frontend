@@ -1,14 +1,11 @@
-import Modern from "./ModernSlaveryPolicy";
-
-
+import { Faqs } from "./Faqs";
 
 export default function page(){
-
-
     return(
         <>
-        
-<Modern/>
+        <Faqs/>
         </>
+
+
     );
 }

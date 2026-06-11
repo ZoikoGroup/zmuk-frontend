@@ -1,14 +1,19 @@
-import Modern from "./ModernSlaveryPolicy";
+import Switch from "./Switch";
+
+
+
 
 
 
 export default function page(){
 
 
+
     return(
         <>
         
-<Modern/>
+        
+        <Switch/>
         </>
     );
 }

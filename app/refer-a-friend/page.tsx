@@ -1,4 +1,4 @@
-import Modern from "./ModernSlaveryPolicy";
+import Referafriend from "./Referafriend";
 
 
 
@@ -8,7 +8,7 @@ export default function page(){
     return(
         <>
         
-<Modern/>
+        <Referafriend/>
         </>
     );
 }

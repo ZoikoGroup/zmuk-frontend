@@ -101,27 +101,27 @@ function StarIcon() {
 /** 1. HERO */
 function Hero() {
   return (
-    <section className="bg-white">
+    <section className="bg-white dark:bg-gray-800">
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 px-4 py-12 sm:px-6 md:px-8 lg:grid-cols-2 lg:gap-6 lg:py-16">
         {/* Text */}
         <div className="order-1">
           <h1 className="font-extrabold leading-tight text-[#c4007a] text-[clamp(2rem,5vw,3.25rem)]">
             Make the Smart Switch today!
           </h1>
-          <p className="mt-4 text-sm leading-relaxed text-gray-500 sm:text-base">
+          <p className="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400 sm:text-base">
             Unlimited Data | Unlimited Calls | Roam Free in 30+ Countries
           </p>
 
           <div className="mt-6 flex items-end gap-2">
             <span className="font-extrabold text-[#e6007e] text-[clamp(2.25rem,6vw,3.5rem)] leading-none">£0.00</span>
-            <span className="mb-1 text-xs text-gray-500 sm:text-sm">/Month For Up To 3 Months*</span>
+            <span className="mb-1 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">/Month For Up To 3 Months*</span>
           </div>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <button type="button" className="rounded-full bg-[#e6007e] px-8 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#c4007a]">
               Switch &amp; Save
             </button>
-            <button type="button" className="rounded-full border border-[#e6007e] px-8 py-3 text-sm font-semibold text-[#e6007e] transition-colors hover:bg-[#fff0f8]">
+            <button type="button" className="rounded-full border border-[#e6007e] px-8 py-3 text-sm font-semibold text-[#e6007e] transition-colors hover:bg-[#fff0f8] dark:hover:bg-[#e6007e]/10">
               View Plans
             </button>
           </div>
@@ -148,19 +148,19 @@ function Hero() {
 /** 2. JOIN ZOIKO */
 function JoinZoiko() {
   return (
-    <section className="bg-white px-4 py-12 sm:px-6 md:px-8">
+    <section className="bg-white px-4 py-12 sm:px-6 md:px-8 dark:bg-gray-800">
       <div className="mx-auto max-w-6xl">
-        <h2 className="text-center font-extrabold text-gray-800 text-[clamp(1.4rem,3.5vw,2rem)]">
+        <h2 className="text-center font-extrabold text-gray-800 dark:text-white text-[clamp(1.4rem,3.5vw,2rem)]">
           Join Zoiko Mobile today and start something new!
         </h2>
 
         <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           {joinFeatures.map((f) => (
-            <div key={f.label} className="flex flex-col items-center gap-3 rounded-xl bg-gray-50 px-3 py-6 text-center">
+            <div key={f.label} className="flex flex-col items-center gap-3 rounded-xl bg-gray-50 px-3 py-6 text-center dark:bg-gray-800">
               <div className="relative h-10 w-10 flex-shrink-0">
                 <Image src={f.icon} alt={f.label} fill sizes="40px" className="object-contain" />
               </div>
-              <span className="text-xs font-medium text-gray-700 sm:text-sm">{f.label}</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-200 sm:text-sm">{f.label}</span>
             </div>
           ))}
         </div>
@@ -172,20 +172,20 @@ function JoinZoiko() {
 /** 3. WHY CHOOSE */
 function WhyChoose() {
   return (
-    <section className="bg-[#eef9f3] px-4 py-14 sm:px-6 md:px-8 lg:py-20">
+    <section className="bg-[#eef9f3] px-4 py-14 sm:px-6 md:px-8 lg:py-20 dark:bg-gray-800">
       <div className="mx-auto max-w-6xl">
-        <h2 className="text-center font-extrabold text-gray-800 text-[clamp(1.5rem,4vw,2.25rem)]">
+        <h2 className="text-center font-extrabold text-gray-800 dark:text-white text-[clamp(1.5rem,4vw,2.25rem)]">
           Why Choose Zoiko Mobile?
         </h2>
 
         <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {whyChoose.map((item) => (
-            <div key={item.title} className="rounded-2xl bg-white p-6 shadow-sm">
+            <div key={item.title} className="rounded-2xl bg-white p-6 shadow-sm dark:bg-gray-800">
               <div className="relative mb-4 h-10 w-10">
                 <Image src={item.icon} alt={item.title} fill sizes="40px" className="object-contain" />
               </div>
-              <h3 className="text-base font-bold text-gray-800">{item.title}</h3>
-              <p className="mt-1 text-sm text-gray-500">{item.desc}</p>
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">{item.title}</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{item.desc}</p>
             </div>
           ))}
         </div>
@@ -199,21 +199,23 @@ function Plans() {
   const [activeTab, setActiveTab] = useState(durationTabs[0]);
 
   return (
-    <section className="bg-white px-4 py-14 sm:px-6 md:px-8 lg:py-20">
+    <section className="bg-white px-4 py-14 sm:px-6 md:px-8 lg:py-20 dark:bg-gray-800">
       <div className="mx-auto max-w-6xl">
-        <h2 className="text-center font-extrabold text-gray-800 text-[clamp(1.5rem,4vw,2.25rem)]">
+        <h2 className="text-center font-extrabold text-gray-800 dark:text-white text-[clamp(1.5rem,4vw,2.25rem)]">
           Choose Your SIM Only Plan &amp; Duration Below
         </h2>
 
         {/* Duration toggle */}
-        <div className="mx-auto mt-8 flex w-fit flex-wrap justify-center gap-1 rounded-full border border-gray-200 p-1">
+        <div className="mx-auto mt-8 flex w-fit flex-wrap justify-center gap-1 rounded-full border border-gray-200 p-1 dark:border-gray-700">
           {durationTabs.map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
               className={`rounded-full px-4 py-2 text-xs font-semibold transition-colors sm:text-sm ${
-                activeTab === tab ? "bg-[#e6007e] text-white" : "text-gray-500 hover:text-gray-700"
+                activeTab === tab
+                  ? "bg-[#e6007e] text-white"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               }`}
             >
               {tab}
@@ -226,10 +228,10 @@ function Plans() {
           {plans.map((plan) => (
             <div
               key={plan.tag}
-              className={`relative flex flex-col rounded-2xl bg-white p-6 sm:p-7 ${
+              className={`relative flex flex-col rounded-2xl bg-white p-6 sm:p-7 dark:bg-gray-800 ${
                 plan.popular
                   ? "border-2 border-[#e6007e] shadow-xl lg:-translate-y-3"
-                  : "border border-gray-200 shadow-sm"
+                  : "border border-gray-200 shadow-sm dark:border-gray-700"
               }`}
             >
               {plan.popular && (
@@ -248,19 +250,19 @@ function Plans() {
 
               <div className="mt-2 text-center">
                 <span className="font-extrabold text-[#e6007e] text-[clamp(1.75rem,4vw,2.25rem)]">{plan.price}</span>
-                <span className="ml-1 text-sm text-gray-500">{plan.priceNote}</span>
+                <span className="ml-1 text-sm text-gray-500 dark:text-gray-400">{plan.priceNote}</span>
               </div>
 
               <ul className="mt-6 flex flex-1 flex-col gap-3">
                 {plan.features.map((feat) => (
-                  <li key={feat} className="flex items-start gap-2 text-sm text-gray-600">
+                  <li key={feat} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
                     <CheckIcon />
                     <span>{feat}</span>
                   </li>
                 ))}
               </ul>
 
-              <button type="button" className="mt-6 rounded-full border border-[#00a859] py-2.5 text-sm font-semibold text-[#00a859] transition-colors hover:bg-[#eef9f3]">
+              <button type="button" className="mt-6 rounded-full border border-[#00a859] py-2.5 text-sm font-semibold text-[#00a859] transition-colors hover:bg-[#eef9f3] dark:hover:bg-[#00a859]/10">
                 View Details
               </button>
               <button type="button" className="mt-3 rounded-full bg-[#e6007e] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
@@ -277,23 +279,23 @@ function Plans() {
 /** 5. CUSTOMER CARE */
 function CustomerCare() {
   return (
-    <section className="bg-[#eef2fb] px-4 py-14 sm:px-6 md:px-8 lg:py-20">
+    <section className="bg-[#eef2fb] px-4 py-14 sm:px-6 md:px-8 lg:py-20 dark:bg-gray-800">
       <div className="mx-auto max-w-6xl">
-        <h2 className="text-center font-extrabold text-gray-800 text-[clamp(1.5rem,4vw,2.25rem)]">
+        <h2 className="text-center font-extrabold text-gray-800 dark:text-white text-[clamp(1.5rem,4vw,2.25rem)]">
           Zoiko Customer Care
         </h2>
-        <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-gray-500">
+        <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-gray-500 dark:text-gray-400">
           We understand the importance of having a mobile. When you may not be on best person in the US, we offer a variety of accessible customer support options.
         </p>
 
         <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {careOptions.map((opt) => (
-            <div key={opt.title} className="flex flex-col items-center rounded-2xl bg-white p-6 text-center shadow-sm">
+            <div key={opt.title} className="flex flex-col items-center rounded-2xl bg-white p-6 text-center shadow-sm dark:bg-gray-800">
               <div className="relative mb-4 h-10 w-10">
                 <Image src={opt.icon} alt={opt.title} fill sizes="40px" className="object-contain" />
               </div>
-              <h3 className="text-base font-bold text-gray-800">{opt.title}</h3>
-              <p className="mt-1 text-sm text-gray-500">{opt.desc}</p>
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">{opt.title}</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{opt.desc}</p>
             </div>
           ))}
         </div>
@@ -305,10 +307,10 @@ function CustomerCare() {
 /** 6. REVIEW */
 function Review() {
   return (
-    <section className="bg-white px-4 py-14 sm:px-6 md:px-8">
+    <section className="bg-white px-4 py-14 sm:px-6 md:px-8 dark:bg-gray-800">
       <div className="mx-auto max-w-2xl text-center">
-        <h2 className="font-extrabold text-gray-800 text-[clamp(1.25rem,3vw,1.75rem)]">Great</h2>
-        <p className="mt-4 text-sm italic leading-relaxed text-gray-500 sm:text-base">
+        <h2 className="font-extrabold text-gray-800 dark:text-white text-[clamp(1.25rem,3vw,1.75rem)]">Great</h2>
+        <p className="mt-4 text-sm italic leading-relaxed text-gray-500 dark:text-gray-400 sm:text-base">
           Zoiko Mobile has extremely changed the way I use my phone. With their affordable prices and excellent customer support, I couldn&rsquo;t be happier with my switch!
         </p>
 
@@ -318,8 +320,8 @@ function Review() {
               <StarIcon key={i} />
             ))}
           </div>
-          <span className="text-sm font-bold text-gray-700">Great</span>
-          <span className="text-sm text-gray-400">Based on over 3,000 reviews</span>
+          <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Great</span>
+          <span className="text-sm text-gray-400 dark:text-gray-500">Based on over 3,000 reviews</span>
         </div>
       </div>
     </section>

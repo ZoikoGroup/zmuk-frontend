@@ -1,14 +1,12 @@
-import Modern from "./ModernSlaveryPolicy";
-
+import Discountedrates from "./Discountedrates";
 
 
 export default function page(){
 
-
     return(
         <>
         
-<Modern/>
+        <Discountedrates/>
         </>
     );
 }

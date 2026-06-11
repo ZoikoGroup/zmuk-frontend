@@ -1,14 +1,11 @@
-import Modern from "./ModernSlaveryPolicy";
-
-
+import { Recharge } from "./Recharge";
 
 export default function page(){
 
 
     return(
         <>
-        
-<Modern/>
+        <Recharge/>
         </>
     );
 }

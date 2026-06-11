@@ -1,14 +1,12 @@
-import Modern from "./ModernSlaveryPolicy";
-
+import Activateform from "./Activateform";
 
 
 export default function page(){
 
-
     return(
         <>
         
-<Modern/>
+      <Activateform/>
         </>
     );
 }
