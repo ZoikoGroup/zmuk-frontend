@@ -135,11 +135,36 @@ export default function ContactUs() {
     setForm((f) => ({ ...f, [target.name]: value }));
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    // TODO: wire up to your contact API
-    console.log("Contact form submitted:", form);
-  };
+ const handleSubmit = async (
+  e: FormEvent<HTMLFormElement>
+) => {
+  e.preventDefault();
+
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/contact-us/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      }
+    );
+
+    const data = await response.json();
+
+    if (response.ok) {
+      alert("Message sent successfully");
+      setForm(initialForm);
+    } else {
+      alert(data.message || "Something went wrong");
+    }
+  } catch (error) {
+    console.error(error);
+    alert("Server error");
+  }
+};
 
   return (
     <main className="bg-gray-50 font-sans dark:bg-gray-800 dark:text-white">
