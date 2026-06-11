@@ -9,7 +9,7 @@ import { Menu, X, ChevronDown, Search, ShoppingCart } from "lucide-react";
 const topLinks = [
   { label: "Activate Your SIM", href: "/activate-your-sim", highlight: true },
   { label: "Top Up", href: "/recharge" },
-  { label: "Switch & Save", href: "/switch-save" },
+  { label: "Switch & Save", href: "/switch-and-save" },
   { label: "Contact Us", href: "/contact-us" },
   { label: "Support", href: "/support" },
   { label: "International Calls", href: "/international-calling" },
