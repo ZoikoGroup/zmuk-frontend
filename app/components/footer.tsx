@@ -25,9 +25,9 @@ const linkColumns: { title: string; links: FooterLink[] }[] = [
     title: "Zoiko Rates",
     links: [
       { label: "Roaming and Overage", href: "/roaming-and-coverage" },
-      { label: "Zero Cost SMS", href: "" },
+      { label: "Zero Cost SMS", href: "/zero-cost-sms" },
       { label: "Discounted Rates", href: "/discounted-rates" },
-      { label: "Refer A Friend", href: "" },
+      { label: "Refer A Friend", href: "/refer-a-friend" },
      
     ],
   },
