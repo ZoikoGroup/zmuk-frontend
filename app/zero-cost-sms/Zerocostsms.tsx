@@ -1,5 +1,7 @@
 // ─── ICONS (inline SVG) ────────────────────────────────────────────────────────
 
+import { JSX } from "react";
+
 const ic = "h-9 w-9";
 const HandIcon = () => (<svg className={ic} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 2a1.5 1.5 0 013 0v6h.5V4a1.5 1.5 0 013 0v6.5h.5V7a1.5 1.5 0 013 0v8a7 7 0 01-7 7h-1.2a7 7 0 01-5.5-2.7L5 16.5c-.9-1.1.6-2.6 1.7-1.8L8 16V4a1.5 1.5 0 013 0v4h0V2z" /></svg>);
 const ClickIcon = () => (<svg className={ic} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 11l9 4-4 1.5L12.5 21 9 11z" /><path strokeLinecap="round" d="M5 4l1 2M3 8h2M5 12l2-1M9 5l1-2" /></svg>);

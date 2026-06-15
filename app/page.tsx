@@ -118,9 +118,9 @@ function Hero() {
           </div>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <button type="button" className="rounded-full bg-[#e6007e] px-8 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#c4007a]">
+          <a href="/switch-and-save">  <button type="button" className="rounded-full bg-[#e6007e] px-8 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#c4007a]">
               Switch &amp; Save
-            </button>
+            </button></a>
             <button type="button" className="rounded-full border border-[#e6007e] px-8 py-3 text-sm font-semibold text-[#e6007e] transition-colors hover:bg-[#fff0f8] dark:hover:bg-[#e6007e]/10">
               View Plans
             </button>

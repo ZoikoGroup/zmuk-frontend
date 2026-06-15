@@ -78,7 +78,7 @@ function ActivateGuide() {
         <div className="mx-auto grid max-w-6xl grid-cols-1 items-start gap-10 lg:grid-cols-2">
           {/* Image slot — Tech Guru Ollie */}
           <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-gray-300 dark:bg-gray-700">
-            <Image src="/images/activate/ollie.jpg" alt="Tech Guru Ollie" fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
+            <Image src="/images/image 292.png" alt="Tech Guru Ollie" fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
           </div>
 
           {/* Steps + CTAs */}

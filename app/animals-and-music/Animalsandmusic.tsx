@@ -80,25 +80,25 @@ const special = [
 ];
 
 const tunes = [
-  { track: "", title: "Crying Wolf", subtitle: "Wildlife Sounds" },
-  { track: "", title: "Roars", subtitle: "Big Cat Symphony" },
-  { track: "", title: "Cat Me", subtitle: "Feline Melodies" },
-  { track: "", title: "Rouva", subtitle: "Canine Chorus" },
+  { track: "https://open.spotify.com/track/49fOxBc8o4a9cNwvglo1zN?go=1&sp_cid=159920746837894a9d8595f457c112fc&intent=1&nd=1&dlsi=e44137b6b8fc4efa", title: "Crying Wolf", subtitle: "Wildlife Sounds" },
+  { track: "https://open.spotify.com/track/74GeIYnKynMtgqOV1BzjfL?go=1&sp_cid=159920746837894a9d8595f457c112fc&intent=1&nd=1&dlsi=a7e063cf0fe744a7", title: "Roars", subtitle: "Big Cat Symphony" },
+  { track: "https://open.spotify.com/track/4EA5ge8hgE6OySXrVqrjxn?go=1&sp_cid=159920746837894a9d8595f457c112fc&intent=1&nd=1&dlsi=88b128ce3e6e4f61", title: "Cat Me", subtitle: "Feline Melodies" },
+  { track: "https://open.spotify.com/track/6QvzZe7cI3MShQDorCavxA?go=1&sp_cid=159920746837894a9d8595f457c112fc&intent=1&nd=1&dlsi=02617f3c41bc4faa", title: "Rouva", subtitle: "Canine Chorus" },
 ];
 
 const artists = [
-  { img: "/images/animals-music/artist-peter.jpg", name: "Peter Graham", role: "Parrot Vocals" },
-  { img: "/images/animals-music/artist-doug.jpg", name: "Doug Carroll", role: "Canine Beats" },
-  { img: "/images/animals-music/artist-jean.jpg", name: "Jean C Sophie", role: "Ocean Sounds" },
-  { img: "/images/animals-music/artist-hayley.jpg", name: "Hayley Hoffman", role: "Small Pet Symphony" },
-  { img: "/images/animals-music/artist-sfx.jpg", name: "Sound Effects Library", role: "Nature Collection" },
-  { img: "/images/animals-music/artist-dog.jpg", name: "Dog Soothing", role: "Relaxation Tunes" },
+  { img: "/images/animal/image 278.png", name: "Peter Graham", role: "Parrot Vocals" },
+  { img: "/images/animal/image 279 (1).png", name: "Doug Carroll", role: "Canine Beats" },
+  { img: "/images/animal/image 280 (1).png", name: "Jean C Sophie", role: "Ocean Sounds" },
+  { img: "/images/animal/image 281 (1).png", name: "Hayley Hoffman", role: "Small Pet Symphony" },
+  { img: "/images/animal/image 282 (1).png", name: "Sound Effects Library", role: "Nature Collection" },
+  { img: "/images/animal/image 283 (1).png", name: "Dog Soothing", role: "Relaxation Tunes" },
 ];
 
 const news = [
-  { img: "/images/animals-music/news-effects.jpg", title: "New effects of music on animals", excerpt: "Latest studies show how different genres affect animal behavior and wellbeing...", date: "March 15, 2025", read: "3 min read" },
-  { img: "/images/animals-music/news-react.jpg", title: "The Ways Animals React When We Play Music", excerpt: "Exploring the fascinating responses of different species to musical stimulation...", date: "March 12, 2025", read: "5 min read" },
-  { img: "/images/animals-music/news-cockatiels.jpg", title: "Cockatiels found to dance with music", excerpt: "Recent research reveals how cockatiels naturally synchronize their movements to beats...", date: "March 10, 2025", read: "4 min read" },
+  { img: "/images/animal/Background.png", title: "New effects of music on animals", excerpt: "Latest studies show how different genres affect animal behavior and wellbeing...", date: "March 15, 2025", read: "3 min read" },
+  { img: "/images/animal/image 284.png", title: "The Ways Animals React When We Play Music", excerpt: "Exploring the fascinating responses of different species to musical stimulation...", date: "March 12, 2025", read: "5 min read" },
+  { img: "/images/animal/image 286.png", title: "Cockatiels found to dance with music", excerpt: "Recent research reveals how cockatiels naturally synchronize their movements to beats...", date: "March 10, 2025", read: "4 min read" },
 ];
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -123,17 +123,31 @@ function AnimalsAndMusic() {
         Welcome to the Animals &amp; Music Channel!
       </div>
 
-      {/* ─── Hero banner ─── */}
-      <section className="relative isolate overflow-hidden bg-gradient-to-r from-[#e6007e] to-[#c4007a] px-4 py-16 text-center text-white sm:px-6 sm:py-20">
-        <Image src="/images/animals-music/hero-collage.png" alt="" fill priority sizes="100vw" className="object-cover object-bottom opacity-30" />
-        <div className="relative mx-auto max-w-3xl">
-          <h1 className="font-extrabold text-[clamp(1.6rem,4vw,2.5rem)]">Where Your Love For Animals Meets The Rhythm Of Music</h1>
-          <p className="mt-2 text-sm text-white/90">Discover The Unique Bond Between Animals And Music</p>
-          <Link href="" className="mt-7 inline-block rounded-full bg-white px-8 py-3 text-sm font-semibold text-[#e6007e] shadow-md transition-opacity hover:opacity-90">
-            View All Plans
-          </Link>
-        </div>
-      </section>
+  
+{/* ─── Hero banner ─── */}
+<section className="relative isolate flex min-h-[480px] items-start justify-center overflow-hidden bg-gradient-to-r from-[#e6007e] to-[#c4007a] px-4 pt-16 pb-40 text-center text-white sm:min-h-[560px] sm:px-6 sm:pt-20">
+  {/* Animal collage — background layer */}
+  <Image
+    src="/images/animal/envato-labs-image-edit (10) (1).png"
+    alt=""
+    fill
+    priority
+    sizes="100vw"
+    className="-z-10 object-cover object-bottom"
+  />
+
+  {/* Content on top */}
+  <div className="relative max-w-3xl">
+    <h1 className="font-extrabold text-[clamp(1.6rem,4vw,2.5rem)]">
+      Where Your Love For Animals Meets The Rhythm Of Music
+    </h1>
+    <p className="mt-2 text-sm text-white/90">Discover The Unique Bond Between Animals And Music</p>
+
+    <Link href="" className="mt-7 inline-block rounded-full bg-white px-8 py-3 text-sm font-semibold text-[#e6007e] shadow-md transition-opacity hover:opacity-90">
+      View All Plans
+    </Link>
+  </div>
+</section>
 
       {/* ─── Adorable Animal Moments ─── */}
       <section className="bg-white px-4 py-14 sm:px-6 md:px-8 dark:bg-gray-900">
