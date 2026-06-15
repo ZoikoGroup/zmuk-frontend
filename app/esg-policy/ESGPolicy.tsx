@@ -19,22 +19,22 @@ const navItems = [
 type Card = { img: string; title: string; desc: string };
 
 const environmental: Card[] = [
-  { img: "/images/esg-compliance.png", title: "Compliance", desc: "Zoiko Mobile is committed to strict compliance with all relevant environmental laws and regulations, ensuring that our operations adhere to the highest environmental standards." },
-  { img: "/images/esg-resource-efficiency.png", title: "Resource Efficiency", desc: "We will actively work to minimize resource consumption and reduce our carbon footprint by embracing energy-efficient practices and waste reduction." },
-  { img: "/images/esg-innovation.png", title: "Innovation for Sustainability", desc: "Zoiko Mobile will drive innovation in the development of environmentally friendly and energy-efficient products and services, contributing to a more sustainable environment." },
+  { img: "/images/Background+Shadow (7).png", title: "Compliance", desc: "Zoiko Mobile is committed to strict compliance with all relevant environmental laws and regulations, ensuring that our operations adhere to the highest environmental standards." },
+  { img: "/images/Background+Shadow (13).png", title: "Resource Efficiency", desc: "We will actively work to minimize resource consumption and reduce our carbon footprint by embracing energy-efficient practices and waste reduction." },
+  { img: "/images/Background+Shadow (14).png", title: "Innovation for Sustainability", desc: "Zoiko Mobile will drive innovation in the development of environmentally friendly and energy-efficient products and services, contributing to a more sustainable environment." },
 ];
 
 const social: Card[] = [
-  { img: "/images/esg-fair-labour.png", title: "Fair Labour Practices", desc: "Zoiko Mobile is committed to maintaining fair labour practices, which include providing fair wages, ensuring safe and healthy working conditions, and respecting workers' rights." },
-  { img: "/images/esg-community.png", title: "Community Engagement", desc: "We actively engage with the communities where we operate, supporting social development, philanthropy, and volunteerism to make a positive impact on society." },
-  { img: "/images/esg-customer-focus.png", title: "Customer Focus", desc: "Our top priority is customer satisfaction. We achieve this by delivering high-quality products and services, maintaining transparency, and conducting our business with the utmost integrity." },
+  { img: "/images/s-shaped.png", title: "Fair Labour Practices", desc: "Zoiko Mobile is committed to maintaining fair labour practices, which include providing fair wages, ensuring safe and healthy working conditions, and respecting workers' rights." },
+  { img: "/images/s-shaped.png", title: "Community Engagement", desc: "We actively engage with the communities where we operate, supporting social development, philanthropy, and volunteerism to make a positive impact on society." },
+  { img: "/images/s-shaped.png", title: "Customer Focus", desc: "Our top priority is customer satisfaction. We achieve this by delivering high-quality products and services, maintaining transparency, and conducting our business with the utmost integrity." },
 ];
 
 const governance: Card[] = [
-  { img: "/images/esg-ethical-conduct.png", title: "Ethical Conduct", desc: "Zoiko Mobile conducts its business with the highest ethical standards, guided by a robust code of conduct that applies to all employees and stakeholders." },
-  { img: "/images/esg-board-diversity.png", title: "Board Diversity", desc: "Our board of directors strives to be diverse in terms of expertise, gender, and background, encouraging a broader range of perspectives in our decision-making processes." },
-  { img: "/images/esg-transparency.png", title: "Transparency and Accountability", desc: "We are committed to maintaining transparency in financial reporting, corporate governance, and decision-making processes, while adhering to legal and regulatory requirements." },
-  { img: "/images/esg-risk-management.png", title: "Risk Management", desc: "Zoiko Mobile actively assesses and manages risks to the business, including those related to ESG issues, to safeguard the long-term interests of our stakeholders." },
+  { img: "/images/Background+Shadow (8).png", title: "Ethical Conduct", desc: "Zoiko Mobile conducts its business with the highest ethical standards, guided by a robust code of conduct that applies to all employees and stakeholders." },
+  { img: "/images/Background+Shadow (9).png", title: "Board Diversity", desc: "Our board of directors strives to be diverse in terms of expertise, gender, and background, encouraging a broader range of perspectives in our decision-making processes." },
+  { img: "/images/Background+Shadow (10).png", title: "Transparency and Accountability", desc: "We are committed to maintaining transparency in financial reporting, corporate governance, and decision-making processes, while adhering to legal and regulatory requirements." },
+  { img: "/images/Background+Shadow (11).png", title: "Risk Management", desc: "Zoiko Mobile actively assesses and manages risks to the business, including those related to ESG issues, to safeguard the long-term interests of our stakeholders." },
 ];
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ function SectionHeader({ num, title }: { num: number; title: string }) {
   return (
     <div className="flex items-start gap-3">
       <NumberBadge num={num} />
-      <h2 className="text-lg font-bold leading-snug text-gray-800 sm:text-xl">{title}</h2>
+      <h2 className="text-lg font-bold leading-snug text-gray-800 dark:text-white sm:text-xl">{title}</h2>
     </div>
   );
 }
@@ -72,10 +72,10 @@ function CardIcon({ src, alt }: { src: string; alt: string }) {
 /** Vertical icon card (used for Environmental + Governance). */
 function IconCard({ card }: { card: Card }) {
   return (
-    <div className="rounded-xl bg-gray-50 p-5 ring-1 ring-gray-100">
+    <div className="rounded-xl bg-gray-50 p-5 ring-1 ring-gray-100 dark:bg-gray-900 dark:ring-gray-700">
       <CardIcon src={card.img} alt={card.title} />
-      <h3 className="mt-4 text-sm font-bold text-gray-700">{card.title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-gray-500">{card.desc}</p>
+      <h3 className="mt-4 text-sm font-bold text-gray-700 dark:text-white">{card.title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{card.desc}</p>
     </div>
   );
 }
@@ -83,25 +83,25 @@ function IconCard({ card }: { card: Card }) {
 /** Full-width row card (used for Social). */
 function RowCard({ card }: { card: Card }) {
   return (
-    <div className="rounded-xl bg-gray-50 p-5 ring-1 ring-gray-100">
+    <div className="rounded-xl bg-gray-50 p-5 ring-1 ring-gray-100 dark:bg-gray-900 dark:ring-gray-700">
       <div className="flex items-center gap-3">
         <CardIcon src={card.img} alt={card.title} />
-        <h3 className="text-sm font-bold text-gray-700">{card.title}</h3>
+        <h3 className="text-sm font-bold text-gray-700 dark:text-white">{card.title}</h3>
       </div>
-      <p className="mt-3 text-sm leading-relaxed text-gray-500">{card.desc}</p>
+      <p className="mt-3 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{card.desc}</p>
     </div>
   );
 }
 
 function sectionCx(extra = "") {
-  return `scroll-mt-24 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 sm:p-8 ${extra}`;
+  return `scroll-mt-24 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700 sm:p-8 ${extra}`;
 }
 
 // ─── PAGE ─────────────────────────────────────────────────────────────────────
 
 function ESGPolicy() {
   return (
-    <main className="bg-gray-50 font-sans">
+    <main className="bg-gray-50 font-sans dark:bg-gray-900">
       {/* ─── Hero ─── */}
       <section className="bg-gradient-to-r from-[#17a06a] to-[#0e8f74] px-4 py-14 text-center text-white sm:px-6 md:px-8">
         <p className="text-xs text-white/80">
@@ -119,12 +119,12 @@ function ESGPolicy() {
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:px-8 lg:grid-cols-[260px_minmax(0,1fr)]">
         {/* Quick navigation */}
         <aside className="lg:sticky lg:top-24 lg:self-start">
-          <nav className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Quick Navigation</p>
+          <nav className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Quick Navigation</p>
             <ul className="mt-4 space-y-2.5">
               {navItems.map((item) => (
                 <li key={item.id}>
-                  <a href={`#${item.id}`} className="block text-sm text-gray-600 transition-colors hover:text-[#0e8f74]">
+                  <a href={`#${item.id}`} className="block text-sm text-gray-600 transition-colors hover:text-[#0e8f74] dark:text-gray-300 dark:hover:text-[#34d39e]">
                     {item.label}
                   </a>
                 </li>
@@ -138,7 +138,7 @@ function ESGPolicy() {
           {/* 1. Introduction */}
           <section id="intro-esg" className={sectionCx()}>
             <SectionHeader num={1} title="Introduction of ESG Policy" />
-            <p className="mt-4 text-sm leading-relaxed text-gray-500">
+            <p className="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
               Zoiko Mobile, a registered trademark of Zoiko Telecom Ltd, establishes this
               Environmental, Social, and Governance (ESG) Policy to formalize our commitment to
               responsible corporate citizenship and sustainability. This policy outlines our core
@@ -179,7 +179,7 @@ function ESGPolicy() {
           {/* 5. Reporting and Continuous Improvement */}
           <section id="reporting" className={sectionCx()}>
             <SectionHeader num={5} title="Reporting and Continuous Improvement" />
-            <div className="mt-4 space-y-3 text-sm leading-relaxed text-gray-500">
+            <div className="mt-4 space-y-3 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
               <p>
                 Zoiko Mobile is committed to regularly assessing and reporting on our ESG performance
                 to ensure transparency and accountability to our stakeholders.
@@ -194,8 +194,8 @@ function ESGPolicy() {
           {/* 6. Compliance */}
           <section id="compliance" className={sectionCx()}>
             <SectionHeader num={6} title="Compliance" />
-            <p className="mt-4 text-sm leading-relaxed text-gray-500">
-              <span className="font-semibold text-gray-700">Zoiko Mobile</span> commits to full
+            <p className="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+              <span className="font-semibold text-gray-700 dark:text-gray-100">Zoiko Mobile</span> commits to full
               compliance with all relevant laws, regulations, and industry standards pertaining to ESG
               issues.
             </p>
@@ -204,7 +204,7 @@ function ESGPolicy() {
           {/* 7. Continuous Enhancement */}
           <section id="continuous-enhancement" className={sectionCx()}>
             <SectionHeader num={7} title="Continuous Enhancement" />
-            <p className="mt-4 text-sm leading-relaxed text-gray-500">
+            <p className="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
               We continuously review and enhance our ESG practices, setting increasingly higher
               standards and achieving better performance in environmental, social, and governance
               matters.
@@ -214,16 +214,16 @@ function ESGPolicy() {
           {/* 8. Conclusion */}
           <section id="conclusion" className={sectionCx()}>
             <SectionHeader num={8} title="Conclusion" />
-            <div className="mt-5 rounded-2xl bg-gradient-to-b from-[#eef9f3] to-[#f6fbf8] p-8 text-center ring-1 ring-[#cdeede]">
+            <div className="mt-5 rounded-2xl bg-gradient-to-b from-[#eef9f3] to-[#f6fbf8] p-8 text-center ring-1 ring-[#cdeede] dark:from-[#0e8f74]/10 dark:to-[#0e8f74]/5 dark:ring-[#0e8f74]/30">
               {/* Conclusion icon — image slot */}
               <Image
-                src="/images/esg-conclusion.png"
+                src="/images/Background+Shadow (12).png"
                 alt="ESG commitment"
-                width={64}
-                height={64}
+                width={80}
+                height={80}
                 className="mx-auto h-16 w-16 object-contain"
               />
-              <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-gray-600">
+              <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-gray-600 dark:text-gray-300">
                 This ESG Policy underscores Zoiko Mobile&rsquo;s unwavering commitment to sustainable
                 and responsible business practices, focusing on environmental conservation, social
                 responsibility, and sound governance. Our aim is to be a leader in ESG initiatives,
@@ -240,4 +240,4 @@ function ESGPolicy() {
 
 // Exported both ways so either default or named import works.
 export default ESGPolicy;
-export { ESGPolicy }; 
+export { ESGPolicy };

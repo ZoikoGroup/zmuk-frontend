@@ -31,13 +31,9 @@ export default function ReasonsToLoveZoiko() {
           {/* Image slot + speech bubble */}
           <div className="relative">
             <div className="relative aspect-[5/4] w-full overflow-hidden rounded-xl bg-gray-300 dark:bg-gray-700">
-              <Image src="/images/reasons/zoikie.jpg" alt="Zoikie the Labrador" fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
+              <Image src="/images/Group 1597883567.png" alt="Zoikie the Labrador" fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
             </div>
-            {/* "Hey there! I'm Zoikie" bubble */}
-            <div className="absolute -bottom-3 right-4 rounded-2xl bg-white px-5 py-3 text-center shadow-lg ring-1 ring-[#1f9d6b]/30 dark:bg-gray-800 dark:ring-[#1f9d6b]/50">
-              <p className="font-bold leading-snug text-[#1f9d6b] dark:text-[#34d39e]">Hey there!</p>
-              <p className="font-bold leading-snug text-[#1f9d6b] dark:text-[#34d39e]">I&rsquo;m Zoikie</p>
-            </div>
+        
           </div>
 
           {/* Copy */}
