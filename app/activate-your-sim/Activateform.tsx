@@ -260,7 +260,7 @@ function Activateform() {
   };
 
   return (
-    <section className="bg-white px-4 py-12 sm:px-6 md:px-8 dark:bg-gray-900">
+    <section className="bg-white px-4 py-12 sm:px-6 md:px-8 dark:bg-gray-900 dark:text-white ">
       <div className="mx-auto max-w-4xl">
         <h1 className="text-center text-2xl font-bold text-gray-800 dark:text-white">Activate Your SIM</h1>
         <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
@@ -316,7 +316,7 @@ function Activateform() {
             <Link
               href="/account"
               className="rounded bg-[#1d6fd8] py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-[#175bb5]"
-            >
+            >s
               Back to My Account
             </Link>
           </div>
