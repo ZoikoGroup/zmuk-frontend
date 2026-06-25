@@ -1,139 +1,206 @@
-
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DUMMY DATA — replace these arrays with your /api/plans/v1/ response later.
-// ─────────────────────────────────────────────────────────────────────────────
+// .env.local -> NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+
+// Category slugs
+const SIM_SLUG = "sim-only-plans";
+const BUSINESS_SLUG = "zoiko-sim-only-business-deals";
+const ROAMING_SLUG = "zoiko-roaming-deals";
 
 type Duration = "24 Month Plan" | "12 Month Plan" | "30 Day Plan";
 const DURATIONS: Duration[] = ["24 Month Plan", "12 Month Plan", "30 Day Plan"];
 
-interface SimPlan {
+interface Feature {
+  id: number;
+  title: string;
+}
+interface Category {
+  id: number;
   name: string;
-  data: string;
-  popular?: boolean;
-  // price per duration
-  prices: Record<Duration, number>;
-  features: string[];
+  slug: string;
+}
+interface Plan {
+  id: number;
+  name: string;
+  slug: string;
+  short_description: string | null;
+  price: string;
+  price_24: string | null;
+  price_12: string | null;
+  price_30: string | null;
+  data_allowance: string | null;
+  tier_label: string | null;
+  is_popular: boolean;
+  category: Category | null;
+  features: Feature[];
 }
 
-const SIM_PLANS: SimPlan[] = [
-  {
-    name: "Thrifty Connect",
-    data: "1GB",
-    prices: { "24 Month Plan": 4.04, "12 Month Plan": 5.04, "30 Day Plan": 6.0 },
-    features: ["150 Calls & Texts", "International Calls*", "Wi-Fi Calling & eSIM", "150 Calling Minutes"],
-  },
-  {
-    name: "Junior Jetsetter",
-    data: "3GB",
-    popular: true,
-    prices: { "24 Month Plan": 5.66, "12 Month Plan": 6.99, "30 Day Plan": 8.49 },
-    features: ["500 Calls & Texts", "International Calls*", "Wi-Fi Calling & eSIM", "500 Calling Minutes"],
-  },
-  {
-    name: "Silver Surfer",
-    data: "10GB",
-    prices: { "24 Month Plan": 12.14, "12 Month Plan": 14.5, "30 Day Plan": 16.99 },
-    features: ["500 Calls & Texts", "International Calls*", "Wi-Fi Calling & eSIM", "500 Calling Minutes"],
-  },
-];
-
-interface FixedPlan {
-  name: string;
-  data: string;
-  price: number;
-  unit: string; // "per month" | "per day"
-  features: string[];
-  highlightData?: boolean; // pale yellow data block (roaming)
+function priceFor(plan: Plan, duration: Duration): string {
+  const raw =
+    duration === "24 Month Plan" ? plan.price_24 :
+    duration === "12 Month Plan" ? plan.price_12 :
+    plan.price_30;
+  return Number(raw ?? plan.price).toFixed(2);
 }
 
-const BUSINESS_PLANS: FixedPlan[] = [
-  {
-    name: "Business Booster Lite",
-    data: "30GB",
-    price: 17.81,
-    unit: "per month",
-    features: ["Unlimited Calls & Texts", "Wi-Fi Calling & eSIM", "Free International Calls", "EU Roaming: 15GB/1000 min /1000 Texts"],
-  },
-  {
-    name: "Business Booster Premium",
-    data: "100GB",
-    price: 29.96,
-    unit: "per month",
-    features: ["Unlimited Calls & Texts", "Wi-Fi Calling & eSIM", "Free International Calls", "EU Roaming: 30GB/2000 min /2000 Texts"],
-  },
-  {
-    name: "Business Booster Pro",
-    data: "UNLIMITED",
-    price: 32.39,
-    unit: "per month",
-    features: ["Unlimited Calls & Texts", "Wi-Fi Calling & eSIM", "Free International Calls", "EU Roaming: 40GB/Unlimited Calls & Texts"],
-  },
-];
-
-const ROAMING_PLANS: FixedPlan[] = [
-  {
-    name: "Day Pass Roaming Zones 2 & 3",
-    data: "500MB",
-    price: 6.99,
-    unit: "per day",
-    highlightData: true,
-    features: ["100 Free Texts", "100 Minutes Calling", "International Calls*", "Out of Bundle Charges 3p per Texts/Minute/MB"],
-  },
-  {
-    name: "Day Pass Roaming Zones 4 & 5",
-    data: "100MB",
-    price: 13.99,
-    unit: "per day",
-    highlightData: true,
-    features: ["100 Free Texts", "100 Minutes Calling", "International Calls*", "Out of Bundle Charges 3p per Texts/Minute/MB"],
-  },
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// UI bits
-// ─────────────────────────────────────────────────────────────────────────────
+function bullets(plan: Plan): string[] {
+  if (plan.features.length > 0) return plan.features.map((f) => f.title);
+  if (!plan.short_description) return [];
+  return plan.short_description.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+}
 
 const Check = () => (
-  <svg className="h-4 w-4 shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+  <svg className="mt-0.5 h-4 w-4 shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
     <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.1 3.1 6.8-6.8a1 1 0 011.4 0z" clipRule="evenodd" />
   </svg>
 );
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-8 text-center">
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{children}</h2>
-      <span className="mt-2 inline-block h-1 w-12 rounded bg-green-500" />
+    <div className="mb-10 text-center">
+      <h2 className="text-2xl font-bold text-gray-800 sm:text-3xl dark:text-white">{children}</h2>
+      <span className="mt-2 inline-block h-1 w-16 rounded bg-green-500" />
     </div>
   );
 }
 
-function FeatureList({ items }: { items: string[] }) {
+function DurationToggle({ duration, setDuration }: { duration: Duration; setDuration: (d: Duration) => void }) {
   return (
-    <ul className="mb-6 space-y-3">
-      {items.map((f) => (
-        <li key={f} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
-          <Check />
-          <span>{f}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="mb-10 flex justify-center">
+      <div className="inline-flex rounded-full border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        {DURATIONS.map((d) => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => setDuration(d)}
+            className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
+              duration === d
+                ? "bg-yellow-400 text-gray-900"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            {d}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
-function CardButtons() {
+const BuyButton = () => (
+  <button className="mt-auto w-full rounded-md bg-[#e6007e] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
+    Buy this plan
+  </button>
+);
+
+// ── Slider card (SIM-only) ──────────────────────────────────────────────────
+function SliderCard({ plan, duration }: { plan: Plan; duration: Duration }) {
   return (
-    <div className="mt-auto space-y-2">
-      <button className="w-full rounded-md border border-green-600 py-2 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700">
-        View Details
-      </button>
-      <button className="w-full rounded-md bg-[#e6007e] py-2 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
-        Buy this plan
-      </button>
+    <div
+      className={`relative flex w-[320px] shrink-0 snap-center flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${
+        plan.is_popular ? "border-2 border-teal-400 lg:scale-105" : "border border-gray-100 dark:border-gray-700"
+      }`}
+    >
+      <div className="flex min-h-[64px] flex-col items-center justify-center text-center">
+        {plan.is_popular && (
+          <span className="mb-1 inline-block rounded-full bg-[#e6007e] px-3 py-0.5 text-xs font-semibold text-white">
+            Most Popular
+          </span>
+        )}
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white">{plan.name}</h3>
+      </div>
+
+      <div className="my-5 flex min-h-[150px] flex-col justify-center rounded-xl bg-gray-50 py-6 text-center dark:bg-gray-900">
+        {plan.data_allowance && (
+          <>
+            <div className="text-4xl font-extrabold text-green-600">{plan.data_allowance}</div>
+            <div className="text-xs tracking-wide text-gray-400">DATA</div>
+          </>
+        )}
+        <div className="mt-3 text-2xl font-bold text-gray-800 dark:text-white">
+          £{priceFor(plan, duration)}
+          <span className="ml-0.5 text-sm font-normal text-gray-400">/month</span>
+        </div>
+      </div>
+
+      <ul className="mb-6 flex-1 space-y-3">
+        {bullets(plan).map((f, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <Check /><span>{f}</span>
+          </li>
+        ))}
+      </ul>
+
+      <BuyButton />
+    </div>
+  );
+}
+
+// ── Business grid card ──────────────────────────────────────────────────────
+function BusinessCard({ plan, duration }: { plan: Plan; duration: Duration }) {
+  return (
+    <div
+      className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${
+        plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
+      }`}
+    >
+      <h3 className="min-h-[32px] text-center text-lg font-bold text-gray-800 dark:text-white">{plan.name}</h3>
+
+      <div className="my-5 flex min-h-[150px] flex-col justify-center rounded-xl bg-gray-50 py-6 text-center dark:bg-gray-900">
+        {plan.data_allowance && (
+          <>
+            <div className="text-4xl font-extrabold text-green-600">{plan.data_allowance}</div>
+            <div className="text-xs tracking-wide text-gray-400">DATA</div>
+          </>
+        )}
+        <div className="mt-3 text-2xl font-bold text-gray-800 dark:text-white">
+          £{priceFor(plan, duration)}
+          <span className="ml-0.5 text-sm font-normal text-gray-400">/month</span>
+        </div>
+      </div>
+
+      <ul className="mb-6 flex-1 space-y-3">
+        {bullets(plan).map((f, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <Check /><span>{f}</span>
+          </li>
+        ))}
+      </ul>
+
+      <BuyButton />
+    </div>
+  );
+}
+
+// ── Roaming card ────────────────────────────────────────────────────────────
+function RoamingCard({ plan }: { plan: Plan }) {
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-800">
+      <h3 className="mb-4 text-center text-lg font-semibold text-gray-700 dark:text-gray-200">{plan.name}</h3>
+
+      <div className="mb-5 flex min-h-[150px] flex-col justify-center rounded-xl bg-yellow-50 py-6 text-center dark:bg-yellow-900/20">
+        {plan.data_allowance && (
+          <>
+            <div className="text-4xl font-extrabold text-green-600">{plan.data_allowance}</div>
+            <div className="text-xs tracking-wide text-gray-400">DATA</div>
+          </>
+        )}
+        <div className="mt-3 text-2xl font-bold text-gray-800 dark:text-white">£{Number(plan.price).toFixed(2)}</div>
+        <div className="text-xs text-gray-400">per day</div>
+      </div>
+
+      <ul className="mb-6 flex-1 space-y-3">
+        {bullets(plan).map((f, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <Check /><span>{f}</span>
+          </li>
+        ))}
+      </ul>
+
+      <BuyButton />
     </div>
   );
 }
@@ -142,11 +209,38 @@ function CardButtons() {
 // PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function Allplans () {
-  const [duration, setDuration] = useState<Duration>("24 Month Plan");
+function Allplans() {
+  const [simDuration, setSimDuration] = useState<Duration>("24 Month Plan");
+  const [bizDuration, setBizDuration] = useState<Duration>("24 Month Plan");
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/plans/v1/`);
+        if (!res.ok) throw new Error("Failed to load plans");
+        setPlans(await res.json());
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load plans");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const simPlans = useMemo(() => plans.filter((p) => p.category?.slug === SIM_SLUG), [plans]);
+  const businessPlans = useMemo(() => plans.filter((p) => p.category?.slug === BUSINESS_SLUG), [plans]);
+  const roamingPlans = useMemo(() => plans.filter((p) => p.category?.slug === ROAMING_SLUG), [plans]);
+
+  const scrollBy = (dir: 1 | -1) => {
+    scroller.current?.scrollBy({ left: dir * 344, behavior: "smooth" });
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="bg-gray-50 dark:bg-gray-900">
       {/* Banner */}
       <div className="bg-gradient-to-r from-green-600 to-teal-500 py-8 px-4 text-center">
         <h1 className="text-2xl font-bold text-white sm:text-3xl">
@@ -156,92 +250,80 @@ function Allplans () {
 
       <div className="mx-auto max-w-6xl px-4 py-10">
 
-        {/* Duration toggle */}
-        <div className="mb-10 flex justify-center">
-          <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
-            {DURATIONS.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDuration(d)}
-                className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
-                  duration === d
-                    ? "bg-yellow-400 text-gray-900"
-                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                }`}
-              >
-                {d}
-              </button>
-            ))}
+        {/* SIM duration toggle */}
+        <DurationToggle duration={simDuration} setDuration={setSimDuration} />
+
+        {loading && (
+          <div className="flex justify-center py-10">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-500 border-t-transparent" role="status">
+              <span className="sr-only">Loading...</span>
+            </div>
           </div>
-        </div>
+        )}
+        {error && (
+          <div className="mb-6 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700">{error}</div>
+        )}
 
-        {/* SIM Only plans */}
-        <div className="mb-16 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {SIM_PLANS.map((p) => (
-            <div
-              key={p.name}
-              className={`relative flex flex-col rounded-xl bg-white p-6 shadow-md dark:bg-gray-800 ${
-                p.popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
-              }`}
-            >
-              <h3 className="text-lg font-bold text-gray-800 dark:text-white">{p.name}</h3>
-              {p.popular && (
-                <span className="mt-2 inline-block w-fit rounded bg-[#e6007e] px-2.5 py-1 text-xs font-semibold text-white">
-                  Most Popular
-                </span>
-              )}
+        {!loading && !error && (
+          <>
+            {/* ── SIM Only slider ── */}
+            {simPlans.length > 0 && (
+              <div className="relative mb-20">
+                <button
+                  type="button"
+                  onClick={() => scrollBy(-1)}
+                  aria-label="Previous"
+                  className="absolute -left-3 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-md hover:bg-gray-50 md:flex dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                >
+                  &#8249;
+                </button>
 
-              <div className="my-5 rounded-lg bg-gray-50 py-6 text-center dark:bg-gray-900">
-                <div className="text-3xl font-extrabold text-green-600">{p.data}</div>
-                <div className="text-xs tracking-wide text-gray-400">DATA</div>
-                <div className="mt-2 text-2xl font-bold text-gray-800 dark:text-white">
-                  £{p.prices[duration].toFixed(2)}
+                <div
+                  ref={scroller}
+                  className="flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth px-1 pb-4 pt-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {simPlans.map((plan) => (
+                    <SliderCard key={plan.id} plan={plan} duration={simDuration} />
+                  ))}
                 </div>
-                <div className="text-xs text-gray-400">per month</div>
-              </div>
 
-              <FeatureList items={p.features} />
-              <CardButtons />
-            </div>
-          ))}
-        </div>
-
-        {/* Business Deals */}
-        <SectionHeading>Zoiko SIM Only Business Deals</SectionHeading>
-        <div className="mb-16 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {BUSINESS_PLANS.map((p) => (
-            <div key={p.name} className="flex flex-col rounded-xl border border-gray-100 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-800">
-              <h3 className="mb-4 font-bold text-gray-800 dark:text-white">{p.name}</h3>
-              <div className="mb-5 rounded-lg bg-gray-50 py-6 text-center dark:bg-gray-900">
-                <div className="text-3xl font-extrabold text-green-600">{p.data}</div>
-                <div className="text-xs tracking-wide text-gray-400">DATA</div>
-                <div className="mt-2 text-2xl font-bold text-gray-800 dark:text-white">£{p.price.toFixed(2)}</div>
-                <div className="text-xs text-gray-400">{p.unit}</div>
+                <button
+                  type="button"
+                  onClick={() => scrollBy(1)}
+                  aria-label="Next"
+                  className="absolute -right-3 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-md hover:bg-gray-50 md:flex dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                >
+                  &#8250;
+                </button>
               </div>
-              <FeatureList items={p.features} />
-              <CardButtons />
-            </div>
-          ))}
-        </div>
+            )}
 
-        {/* Roaming Deals */}
-        <SectionHeading>Zoiko Roaming Deals</SectionHeading>
-        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
-          {ROAMING_PLANS.map((p) => (
-            <div key={p.name} className="flex flex-col rounded-xl border border-gray-100 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-800">
-              <h3 className="mb-4 font-semibold text-gray-700 dark:text-gray-200">{p.name}</h3>
-              <div className="mb-5 rounded-lg bg-yellow-50 py-6 text-center dark:bg-yellow-900/20">
-                <div className="text-3xl font-extrabold text-green-600">{p.data}</div>
-                <div className="text-xs tracking-wide text-gray-400">DATA</div>
-                <div className="mt-2 text-2xl font-bold text-gray-800 dark:text-white">£{p.price.toFixed(2)}</div>
-                <div className="text-xs text-gray-400">{p.unit}</div>
-              </div>
-              <FeatureList items={p.features} />
-              <CardButtons />
-            </div>
-          ))}
-        </div>
+            {/* ── Business Deals ── */}
+            {businessPlans.length > 0 && (
+              <section className="mb-20">
+                <SectionHeading>Zoiko SIM Only Business Deals</SectionHeading>
+                <DurationToggle duration={bizDuration} setDuration={setBizDuration} />
+                <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
+                  {businessPlans.map((plan) => (
+                    <BusinessCard key={plan.id} plan={plan} duration={bizDuration} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Roaming Deals ── */}
+            {roamingPlans.length > 0 && (
+              <section className="mb-10">
+                <SectionHeading>Zoiko Roaming Deals</SectionHeading>
+                <div className="mx-auto grid max-w-4xl grid-cols-1 items-stretch gap-6 md:grid-cols-2">
+                  {roamingPlans.map((plan) => (
+                    <RoamingCard key={plan.id} plan={plan} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
 
         {/* Testimonial */}
         <div className="mx-auto mt-16 max-w-2xl text-center">
@@ -266,5 +348,5 @@ function Allplans () {
   );
 }
 
-export default Allplans ;
-export { Allplans  };
+export default Allplans;
+export { Allplans };
