@@ -15,19 +15,41 @@ const topLinks = [
   { label: "International Calls", href: "/international-calling" },
 ];
 
-// Main nav. `dropdown` is optional. (Zoiko Plans sub-links are placeholders — edit to taste.)
-const navLinks = [
+// A dropdown can be either a flat list of links, or grouped sections.
+type DropItem = { label: string; href: string };
+type DropGroup = { heading?: string; items: DropItem[] };
+
+type NavItem = {
+  label: string;
+  href: string;
+  groups?: DropGroup[]; // grouped mega-dropdown
+};
+
+// Main nav. "Zoiko Plans" uses the grouped dropdown matching the live site.
+const navLinks: NavItem[] = [
   {
     label: "Zoiko Plans",
     href: "/plans",
-    dropdown: [
-      { label: "SIM Only Plans", href: "/plans" },
-      { label: "Data Only SIMs", href: "/data-only-sims" },
-      { label: "Business SIM Deals", href: "/business-sim-deals" },
-      { label: "30-Day Plans", href: "/30-day-plans" },
+    groups: [
+      { items: [{ label: "All Plans", href: "/plans" }] },
+      {
+        heading: "For You",
+        items: [
+          { label: "Student Plans", href: "/student-deals" },
+          { label: "Essential Worker Plans", href: "/civilservants" },
+          { label: "Social Tariff Plans", href: "/social-tariff-plans" },
+        ],
+      },
+      {
+        heading: "Usage & Flexibility",
+        items: [
+          { label: "Data-Only Plans", href: "/data-only-plans" },
+          { label: "Flexible 30-Day Plans", href: "/30-day-plan" },
+        ],
+      },
     ],
   },
-  { label: "Business Deals", href: "/business-deals" },
+  { label: "Business Deals", href: "/business-deals_sim-only-plans" },
   { label: "Devices", href: "/devices" },
   { label: "Animals & Music", href: "/animals-and-music" },
   { label: "About Us", href: "/about-us" },
@@ -71,7 +93,7 @@ export default function Header() {
           {/* Desktop nav */}
           <nav className="hidden items-center gap-7 lg:flex">
             {navLinks.map((item) =>
-              item.dropdown ? (
+              item.groups ? (
                 <div key={item.label} className="group relative">
                   <Link
                     href={item.href}
@@ -82,15 +104,24 @@ export default function Header() {
                   </Link>
                   {/* pt-3 keeps a hover bridge between the link and the menu */}
                   <div className="invisible absolute left-0 top-full z-50 pt-3 opacity-0 transition-all group-hover:visible group-hover:opacity-100">
-                    <div className="w-56 rounded-xl border border-gray-100 bg-white py-2 shadow-xl dark:border-gray-700 dark:bg-gray-800">
-                      {item.dropdown.map((d) => (
-                        <Link
-                          key={d.label}
-                          href={d.href}
-                          className="block px-5 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 hover:text-[#e6007e] dark:text-gray-200 dark:hover:bg-gray-700"
-                        >
-                          {d.label}
-                        </Link>
+                    <div className="w-64 rounded-xl border border-gray-100 bg-white py-2 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                      {item.groups.map((group, gi) => (
+                        <div key={gi} className={gi > 0 ? "mt-1 border-t border-gray-100 pt-1 dark:border-gray-700" : ""}>
+                          {group.heading && (
+                            <p className="px-5 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                              {group.heading}
+                            </p>
+                          )}
+                          {group.items.map((d) => (
+                            <Link
+                              key={d.label}
+                              href={d.href}
+                              className="block px-5 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 hover:text-[#e6007e] dark:text-gray-200 dark:hover:bg-gray-700"
+                            >
+                              {d.label}
+                            </Link>
+                          ))}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -150,7 +181,7 @@ export default function Header() {
         <nav className="border-b border-gray-100 bg-white lg:hidden dark:border-gray-800 dark:bg-gray-800">
           {/* Main nav links */}
           {navLinks.map((item) =>
-            item.dropdown ? (
+            item.groups ? (
               <div key={item.label}>
                 <button
                   type="button"
@@ -166,15 +197,24 @@ export default function Header() {
                 </button>
                 {openDropdown === item.label && (
                   <div className="bg-gray-50 dark:bg-gray-800">
-                    {item.dropdown.map((d) => (
-                      <Link
-                        key={d.label}
-                        href={d.href}
-                        onClick={() => setMobileOpen(false)}
-                        className="block border-b border-gray-100 py-3 pl-8 pr-5 text-sm text-gray-600 last:border-0 active:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:active:bg-gray-700"
-                      >
-                        {d.label}
-                      </Link>
+                    {item.groups.map((group, gi) => (
+                      <div key={gi}>
+                        {group.heading && (
+                          <p className="px-6 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                            {group.heading}
+                          </p>
+                        )}
+                        {group.items.map((d) => (
+                          <Link
+                            key={d.label}
+                            href={d.href}
+                            onClick={() => setMobileOpen(false)}
+                            className="block border-b border-gray-100 py-3 pl-8 pr-5 text-sm text-gray-600 last:border-0 active:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:active:bg-gray-700"
+                          >
+                            {d.label}
+                          </Link>
+                        ))}
+                      </div>
                     ))}
                   </div>
                 )}
