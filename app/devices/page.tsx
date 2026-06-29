@@ -1,11 +1,5 @@
 import DevicesList from "./Deviceslist";
 
-export default function page(){
-
-
-    return(
-        <>
-        <DevicesList/>
-        </>
-    );
+export default function Page() {
+  return <DevicesList />;
 }
