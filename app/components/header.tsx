@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { Menu, X, ChevronDown, Search, ShoppingCart } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Menu, X, ChevronDown, Search, ShoppingCart, LayoutDashboard, LogOut } from "lucide-react";
 
 // Top utility bar links
 const topLinks = [
@@ -56,8 +57,36 @@ const navLinks: NavItem[] = [
 ];
 
 export default function Header() {
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Read auth state from localStorage on mount + keep it in sync
+  useEffect(() => {
+    const check = () => setIsLoggedIn(!!localStorage.getItem("zoiko_token"));
+    check();
+    // "zoiko-auth" -> fired by the login page after a successful login (same tab)
+    // "storage"    -> fired when another tab logs in/out
+    // "focus"      -> re-check when the window regains focus
+    window.addEventListener("zoiko-auth", check);
+    window.addEventListener("storage", check);
+    window.addEventListener("focus", check);
+    return () => {
+      window.removeEventListener("zoiko-auth", check);
+      window.removeEventListener("storage", check);
+      window.removeEventListener("focus", check);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("zoiko_token");
+    localStorage.removeItem("zoiko_user");
+    setIsLoggedIn(false);
+    setMobileOpen(false);
+    router.push("/");
+    router.refresh();
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white dark:bg-gray-800">
@@ -136,9 +165,20 @@ export default function Header() {
                 </Link>
               )
             )}
+
+            {/* Dashboard link (only when logged in) */}
+            {isLoggedIn && (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1.5 text-sm font-medium text-gray-700 transition-colors hover:text-[#e6007e] dark:text-gray-200"
+              >
+                <LayoutDashboard size={16} />
+                Dashboard
+              </Link>
+            )}
           </nav>
 
-          {/* Right: search, cart, login, hamburger */}
+          {/* Right: search, cart, login/logout, hamburger */}
           <div className="flex items-center gap-1 sm:gap-2">
             <button
               type="button"
@@ -156,12 +196,23 @@ export default function Header() {
               <ShoppingCart size={20} />
             </Link>
 
-            <Link
-              href="/login"
-              className="hidden rounded-full bg-gradient-to-r from-[#17a06a] to-[#0e8f74] px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 sm:inline-block"
-            >
-              Login
-            </Link>
+            {isLoggedIn ? (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="hidden items-center gap-1.5 rounded-full border border-[#e6007e] px-5 py-2.5 text-sm font-semibold text-[#e6007e] transition-colors hover:bg-[#e6007e] hover:text-white sm:inline-flex"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="hidden rounded-full bg-gradient-to-r from-[#17a06a] to-[#0e8f74] px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 sm:inline-block"
+              >
+                Login
+              </Link>
+            )}
 
             <button
               type="button"
@@ -231,6 +282,18 @@ export default function Header() {
             )
           )}
 
+          {/* Dashboard (only when logged in) */}
+          {isLoggedIn && (
+            <Link
+              href="/dashboard"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 border-b border-gray-100 px-5 py-3.5 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-800 dark:text-gray-200 dark:active:bg-gray-800"
+            >
+              <LayoutDashboard size={16} />
+              Dashboard
+            </Link>
+          )}
+
           {/* Top utility links (shown here on mobile since the top bar is desktop-only) */}
           <div className="bg-gray-50 dark:bg-gray-800">
             {topLinks.map((l) => (
@@ -249,15 +312,26 @@ export default function Header() {
             ))}
           </div>
 
-          {/* Login */}
+          {/* Login / Logout */}
           <div className="px-5 py-4">
-            <Link
-              href="/login"
-              onClick={() => setMobileOpen(false)}
-              className="block rounded-full bg-gradient-to-r from-[#17a06a] to-[#0e8f74] py-3 text-center text-sm font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              Login
-            </Link>
+            {isLoggedIn ? (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center justify-center gap-2 rounded-full border border-[#e6007e] py-3 text-center text-sm font-semibold text-[#e6007e] transition-colors hover:bg-[#e6007e] hover:text-white"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="block rounded-full bg-gradient-to-r from-[#17a06a] to-[#0e8f74] py-3 text-center text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                Login
+              </Link>
+            )}
           </div>
         </nav>
       )}

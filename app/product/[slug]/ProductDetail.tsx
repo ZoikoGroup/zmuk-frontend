@@ -33,7 +33,7 @@ interface Product {
 // MEDIA urls may come back relative ("/media/..") -> prefix with API_BASE
 const absUrl = (u: string) => (u && u.startsWith("/") ? `${API_BASE}${u}` : u);
 
-function ProductDetail({ slug = "iphone-11-pro" }: { slug?: string }) {
+function ProductDetail({ slug }: { slug: string }) {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +43,13 @@ function ProductDetail({ slug = "iphone-11-pro" }: { slug?: string }) {
   const [qty, setQty] = useState(1);
 
   useEffect(() => {
+    if (!slug) {
+      setError("Product not found");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/api/products/${slug}/`);
@@ -84,20 +91,23 @@ function ProductDetail({ slug = "iphone-11-pro" }: { slug?: string }) {
         )
     );
 
-  // The variant that exactly matches all selected attributes
+  // The variant(s) that exactly match all selected attributes.
+  // If duplicates exist for the same combo, prefer one that is in stock.
   const matched = useMemo(() => {
     if (!product) return null;
     const names = product.attribute_options.map((o) => o.name);
     if (names.some((n) => !selected[n])) return null; // not all chosen
-    return (
-      activeVariants.find((v) =>
-        names.every((n) => v.attributes_dict[n] === selected[n])
-      ) ?? null
+    const matches = activeVariants.filter((v) =>
+      names.every((n) => v.attributes_dict[n] === selected[n])
     );
+    // prefer an in-stock variant; fall back to the first match
+    return matches.find((v) => v.in_stock || Number(v.stock) > 0) ?? matches[0] ?? null;
   }, [product, activeVariants, selected]);
 
+  // Treat stock > 0 as the source of truth (don't rely solely on the in_stock flag)
+  const inStock = !!matched && (matched.in_stock || Number(matched.stock) > 0);
   const price = matched ? Number(matched.price) : null;
-  const canAdd = !!matched && matched.in_stock;
+  const canAdd = inStock;
 
   if (loading) {
     return (
@@ -185,7 +195,7 @@ function ProductDetail({ slug = "iphone-11-pro" }: { slug?: string }) {
             <p className="text-3xl font-extrabold text-gray-900 dark:text-white">
               {price !== null ? `£${price.toFixed(2)}` : "Select options"}
             </p>
-            {matched && !matched.in_stock && (
+            {matched && !inStock && (
               <p className="mt-1 text-sm font-medium text-red-500">Out of stock</p>
             )}
           </div>

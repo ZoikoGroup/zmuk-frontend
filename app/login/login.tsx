@@ -42,8 +42,9 @@ function setSession(token: string, user: AuthUser) {
   if (typeof window === "undefined") return;
   localStorage.setItem("zoiko_token", token);
   localStorage.setItem("zoiko_user", JSON.stringify(user));
+  
+  window.dispatchEvent(new Event("zoiko-auth"));
 }
-
 // Pull a readable message out of a DRF error response (handles field errors + non_field_errors).
 function parseError(data: unknown, fallback: string): string {
   if (!data || typeof data !== "object") return fallback;

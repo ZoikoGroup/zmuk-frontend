@@ -1,5 +1,11 @@
+// app/product/[slug]/page.tsx
 import ProductDetail from "./ProductDetail";
 
-export default function Page({ params }: { params: { slug: string } }) {
-  return <ProductDetail slug={params.slug} />;
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  return <ProductDetail slug={slug} />;
 }
