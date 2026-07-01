@@ -123,11 +123,11 @@ function SupportHub() {
           <h2 className="text-lg font-bold text-gray-800 dark:text-white">Customer Dashboard</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage your account and services</p>
           <Link
-            href="/account"
+            href="/login"
             className="group mt-6 flex items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-[#1ba36b] to-[#0e8f74] p-5 text-white transition-opacity hover:opacity-95"
           >
             <div>
-              <p className="font-bold">Login</p>
+             <p className="font-bold">Login</p>
               <p className="mt-1 text-sm text-white/90">Access your MyZoiko account to manage your services and billing</p>
             </div>
             <svg className="h-5 w-5 flex-shrink-0 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

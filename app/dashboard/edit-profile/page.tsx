@@ -160,7 +160,7 @@ export default function EditProfilePage() {
 
           {/* Page Header */}
           <div className="flex justify-between items-center mb-6">
-            <h4 className="text-xl font-bold">Edit Profile</h4>
+            <h4 className="text-xl font-bold dark:bg-gray-900 dark:text-white">Edit Profile</h4>
           </div>
 
           {/* Toast */}
@@ -183,18 +183,18 @@ export default function EditProfilePage() {
             <h5 className="font-semibold text-base mb-4">Account Info</h5>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-gray-400 text-xs mb-1">Username</p>
+                <p className="text-gray-400 text-xs mb-1 dark:bg-gray-900 dark:text-white">Username</p>
                 <p className="text-sm font-medium">{username || "—"}</p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs mb-1">Email</p>
+                <p className="text-gray-400 text-xs mb-1 dark:bg-gray-900 dark:text-white">Email</p>
                 <p className="text-sm font-medium">{email || "—"}</p>
               </div>
             </div>
           </div>
 
           {/* Personal Info Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+          <div className="bg-white dark:bg-gray-900 dark:text-white rounded-lg shadow-md p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="text-green-500 text-xl">
                 <FaUser />
@@ -204,7 +204,7 @@ export default function EditProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1.5">
+                <label className="block text-sm dark:bg-gray-900 dark:text-white text-gray-500 mb-1.5">
                   First name
                 </label>
                 <input
@@ -212,11 +212,11 @@ export default function EditProfilePage() {
                   placeholder="John"
                   value={nameData.first_name}
                   onChange={(e) => setNameData({ ...nameData, first_name: e.target.value })}
-                  className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition"
+                  className="w-full h-10 px-3 border dark:bg-gray-900 dark:text-white border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1.5">
+                <label className="block text-sm dark:bg-gray-900 dark:text-white text-gray-500  mb-1.5">
                   Last name
                 </label>
                 <input

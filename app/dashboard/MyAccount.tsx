@@ -392,11 +392,11 @@ export default function MyAccountPage() {
                   <p className="text-gray-400 text-sm mb-4">{accountEmail || "—"}</p>
                   <div className="flex gap-2 mt-auto">
                     <Link href="/dashboard/edit-profile"
-                      className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors">
+                      className="px-3 py-1.5 border border-gray-300 dark:bg-gray-900 dark:text-white text-gray-700 text-sm rounded-md hover:bg-gray-500 transition-colors">
                       Edit Profile
                     </Link>
                     <Link href="/dashboard/security"
-                      className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors">
+                      className="px-3 py-1.5 border border-gray-300 dark:bg-gray-900 dark:text-white text-gray-700 text-sm rounded-md hover:bg-gray-500 transition-colors">
                       Security
                     </Link>
                   </div>
