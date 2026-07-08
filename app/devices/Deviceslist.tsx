@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // .env.local -> NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
@@ -47,7 +48,7 @@ const SORTS: { value: Sort; label: string }[] = [
   { value: "name", label: "Name: A to Z" },
 ];
 
-function DeviceCard({ d }: { d: Product }) {
+function DeviceCard({ d, onBuy }: { d: Product; onBuy: (d: Product) => void }) {
   const conditions = attrValues(d, "Condition");
   const colours = attrValues(d, "Color", "Colour");
   const storages = attrValues(d, "Storage");
@@ -91,12 +92,21 @@ function DeviceCard({ d }: { d: Product }) {
         </div>
       )}
 
-      <Link
-        href={`/product/${d.slug}`}
-        className="mt-auto block w-full rounded-md border border-green-600 py-2.5 text-center text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700"
-      >
-        View Details
-      </Link>
+      <div className="mt-auto space-y-2">
+        <button
+          type="button"
+          onClick={() => onBuy(d)}
+          className="block w-full rounded-md bg-[#e6007e] py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]"
+        >
+          Buy Now
+        </button>
+        <Link
+          href={`/product/${d.slug}`}
+          className="block w-full rounded-md border border-green-600 py-2.5 text-center text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700"
+        >
+          View Details
+        </Link>
+      </div>
     </div>
   );
 }
@@ -107,15 +117,51 @@ function DevicesList() {
   const [error, setError] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("default");
   const [page, setPage] = useState(1);
+  const router = useRouter();
+
+  // Write the product into the checkout cart, then go to /checkout.
+  // Shape matches what Checkout.tsx expects: { id, slug, name, image, price, qty, attributes }.
+  const buyNow = (d: Product) => {
+    const item = {
+      id: d.id,
+      slug: d.slug,
+      name: d.name,
+      image: d.primary_image,
+      price: Number(d.price_min ?? 0),
+      qty: 1,
+      attributes: Object.fromEntries((d.attributes ?? []).map((a) => [a.name, a.values[0] ?? ""])),
+    };
+    try {
+      localStorage.setItem("cart", JSON.stringify([item]));
+      window.dispatchEvent(new Event("cart-updated"));
+    } catch {
+      /* ignore storage errors */
+    }
+    router.push("/checkout");
+  };
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(LIST_URL);
-        if (!res.ok) throw new Error("Failed to load products");
-        const data = await res.json();
-        // supports array OR paginated { results: [...] }
-        setProducts(Array.isArray(data) ? data : data.results ?? []);
+        // Follow DRF pagination: keep fetching `next` until every product is loaded.
+        // (Backend returns { count, next, previous, results }; a plain array also works.)
+        const all: Product[] = [];
+        let url: string | null = LIST_URL;
+        let guard = 0;
+        while (url && guard < 100) {
+          const res: Response = await fetch(url);
+          if (!res.ok) throw new Error("Failed to load products");
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            all.push(...data);
+            url = null; // non-paginated response = everything in one go
+          } else {
+            all.push(...(data.results ?? []));
+            url = data.next ?? null; // next page (absolute URL from DRF)
+          }
+          guard += 1;
+        }
+        setProducts(all);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load products");
       } finally {
@@ -167,7 +213,7 @@ function DevicesList() {
           <p className="text-center text-gray-500">No products available yet.</p>
         ) : (
           <div className="grid grid-cols-1 items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {pageItems.map((d) => <DeviceCard key={d.id} d={d} />)}
+            {pageItems.map((d) => <DeviceCard key={d.id} d={d} onBuy={buyNow} />)}
           </div>
         )}
 
