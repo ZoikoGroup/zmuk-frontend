@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useCart } from "../context/Cartcontext";
 import React, { useEffect, useMemo, useState } from "react";
 
 // .env.local -> NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
@@ -84,13 +86,13 @@ function FeatureBlock({ items }: { items: string[] }) {
   );
 }
 
-function Buttons() {
+function Buttons({ onclick }: { onclick: () => void }) {
   return (
     <div className="mt-auto space-y-2">
-      <button className="w-full rounded-md border border-green-600 py-2 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700">
+      {/* <button className="w-full rounded-md border border-green-600 py-2 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700">
         View Details
-      </button>
-      <button className="w-full rounded-md bg-[#e6007e] py-2 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
+      </button> */}
+      <button onClick={onclick} className="w-full rounded-md bg-[#e6007e] py-2 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]" >
         Buy this plan
       </button>
     </div>
@@ -116,12 +118,11 @@ function SectionHead({ title, sub }: { title: string; sub?: string }) {
 }
 
 // ── Cards ──
-function SimCard({ plan, duration }: { plan: Plan; duration: SimDuration }) {
+function SimCard({ plan, duration ,onBuyNow }: { plan: Plan; duration: SimDuration; onBuyNow: (plan: Plan) => void }) {
   const price = duration === "12 Months" ? num(plan.price_12, plan.price) : num(plan.price_30, plan.price);
   return (
-    <div className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${
-      plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
-    }`}>
+    <div className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
+      }`}>
       {plan.is_popular && <Badge text="Most Popular" />}
       <h3 className="mb-4 text-center text-base font-semibold text-gray-800 dark:text-white">{plan.name}</h3>
       <div className="mb-5 flex min-h-[130px] flex-col justify-center rounded-xl bg-gray-50 py-5 text-center dark:bg-gray-900">
@@ -135,16 +136,15 @@ function SimCard({ plan, duration }: { plan: Plan; duration: SimDuration }) {
         <div className="text-xs text-gray-400">per month</div>
       </div>
       <FeatureBlock items={lines(plan)} />
-      <Buttons />
+      <Buttons onclick={() => onBuyNow(plan)} />
     </div>
   );
 }
 
-function BroadbandCard({ plan }: { plan: Plan }) {
+function BroadbandCard({ plan, onBuyNow }: { plan: Plan; onBuyNow: (plan: Plan) => void }) {
   return (
-    <div className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${
-      plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
-    }`}>
+    <div className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
+      }`}>
       {plan.is_popular && <Badge text="Recommended" />}
       <h3 className="mb-4 text-base font-semibold text-gray-800 dark:text-white">{plan.name}</h3>
       <div className="mb-5 flex min-h-[120px] flex-col justify-center rounded-xl bg-gray-50 py-5 text-center dark:bg-gray-900">
@@ -154,12 +154,12 @@ function BroadbandCard({ plan }: { plan: Plan }) {
         <div className="text-xs text-gray-400">per month</div>
       </div>
       <FeatureBlock items={lines(plan)} />
-      <Buttons />
+      <Buttons onclick={() => onBuyNow(plan)} />
     </div>
   );
 }
 
-function PhoneCard({ plan }: { plan: Plan }) {
+function PhoneCard({ plan, onBuyNow }: { plan: Plan; onBuyNow: (plan: Plan) => void }) {
   return (
     <div className="relative flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-800">
       <h3 className="mb-3 text-base font-semibold text-gray-800 dark:text-white">{plan.name}</h3>
@@ -168,16 +168,15 @@ function PhoneCard({ plan }: { plan: Plan }) {
         <div className="text-xs text-gray-400">per month</div>
       </div>
       <FeatureBlock items={lines(plan)} />
-      <Buttons />
+      <Buttons onclick={() => onBuyNow(plan)} />
     </div>
   );
 }
 
-function ComboCard({ plan }: { plan: Plan }) {
+function ComboCard({ plan, onBuyNow }: { plan: Plan; onBuyNow: (plan: Plan) => void }) {
   return (
-    <div className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${
-      plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
-    }`}>
+    <div className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
+      }`}>
       {plan.is_popular && <Badge text="Best Value" />}
       <h3 className="mb-3 text-base font-semibold text-gray-800 dark:text-white">{plan.name}</h3>
       <div className="mb-5">
@@ -185,7 +184,7 @@ function ComboCard({ plan }: { plan: Plan }) {
         <div className="text-xs text-gray-400">per month</div>
       </div>
       <FeatureBlock items={lines(plan)} />
-      <Buttons />
+      <Buttons onclick={() => onBuyNow(plan)} />
     </div>
   );
 }
@@ -199,6 +198,13 @@ function Saverdeals() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { addPlanToCart } = useCart();
+  const router = useRouter();
+
+  const handleBuyNow = (plan: Plan) => {
+    addPlanToCart(plan);
+    router.push("/checkout");
+  };
 
   useEffect(() => {
     (async () => {
@@ -274,9 +280,8 @@ function Saverdeals() {
                         key={d}
                         type="button"
                         onClick={() => setSimDuration(d)}
-                        className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
-                          simDuration === d ? "bg-yellow-400 text-gray-900" : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                        }`}
+                        className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${simDuration === d ? "bg-yellow-400 text-gray-900" : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                          }`}
                       >
                         {d}
                       </button>
@@ -284,7 +289,7 @@ function Saverdeals() {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
-                  {sim.map((p) => <SimCard key={p.id} plan={p} duration={simDuration} />)}
+                  {sim.map((p) => <SimCard key={p.id} plan={p} duration={simDuration} onBuyNow={handleBuyNow} />)}
                 </div>
               </section>
             )}
@@ -294,7 +299,7 @@ function Saverdeals() {
               <section className="py-16">
                 <SectionHead title="Super-fast Broadband" sub="Contract Duration - 12 Month" />
                 <div className="mx-auto grid max-w-4xl grid-cols-1 items-stretch gap-6 md:grid-cols-2">
-                  {broadband.map((p) => <BroadbandCard key={p.id} plan={p} />)}
+                  {broadband.map((p) => <BroadbandCard key={p.id} plan={p} onBuyNow={handleBuyNow} />)}
                 </div>
               </section>
             )}
@@ -304,7 +309,7 @@ function Saverdeals() {
               <section className="py-16">
                 <SectionHead title="Digital Phone Lines" sub="Contract Duration - 12 Month" />
                 <div className="mx-auto grid max-w-4xl grid-cols-1 items-stretch gap-6 md:grid-cols-2">
-                  {phone.map((p) => <PhoneCard key={p.id} plan={p} />)}
+                  {phone.map((p) => <PhoneCard key={p.id} plan={p} onBuyNow={handleBuyNow} />)}
                 </div>
               </section>
             )}
@@ -314,7 +319,7 @@ function Saverdeals() {
               <section className="py-16">
                 <SectionHead title="Zoiko Combo Deals" sub="Contract Duration - 12 Month" />
                 <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
-                  {combo.map((p) => <ComboCard key={p.id} plan={p} />)}
+                  {combo.map((p) => <ComboCard key={p.id} plan={p} onBuyNow={handleBuyNow} />)}
                 </div>
               </section>
             )}

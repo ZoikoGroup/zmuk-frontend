@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCart } from "../context/Cartcontext";
 
 // .env.local -> NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
@@ -36,13 +38,18 @@ interface Plan {
   is_popular: boolean;
   category: Category | null;
   features: Feature[];
+  transatelID: string | null;
+  final_price: string;
+  duration_days: number;
 }
+
+
 
 function priceFor(plan: Plan, duration: Duration): string {
   const raw =
     duration === "24 Month Plan" ? plan.price_24 :
-    duration === "12 Month Plan" ? plan.price_12 :
-    plan.price_30;
+      duration === "12 Month Plan" ? plan.price_12 :
+        plan.price_30;
   return Number(raw ?? plan.price).toFixed(2);
 }
 
@@ -76,11 +83,10 @@ function DurationToggle({ duration, setDuration }: { duration: Duration; setDura
             key={d}
             type="button"
             onClick={() => setDuration(d)}
-            className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
-              duration === d
+            className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${duration === d
                 ? "bg-yellow-400 text-gray-900"
                 : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            }`}
+              }`}
           >
             {d}
           </button>
@@ -90,19 +96,21 @@ function DurationToggle({ duration, setDuration }: { duration: Duration; setDura
   );
 }
 
-const BuyButton = () => (
-  <button className="mt-auto w-full rounded-md bg-[#e6007e] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
+const BuyButton = ({ onClick }: { onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    className="mt-auto w-full rounded-md bg-[#e6007e] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]"
+  >
     Buy this plan
   </button>
 );
 
 // ── Slider card (SIM-only) ──────────────────────────────────────────────────
-function SliderCard({ plan, duration }: { plan: Plan; duration: Duration }) {
+function SliderCard({ plan, duration, onBuyNow }: { plan: Plan; duration: Duration; onBuyNow: (plan: Plan) => void }) {
   return (
     <div
-      className={`relative flex w-[320px] shrink-0 snap-center flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${
-        plan.is_popular ? "border-2 border-teal-400 lg:scale-105" : "border border-gray-100 dark:border-gray-700"
-      }`}
+      className={`relative flex w-[320px] shrink-0 snap-center flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${plan.is_popular ? "border-2 border-teal-400 lg:scale-105" : "border border-gray-100 dark:border-gray-700"
+        }`}
     >
       <div className="flex min-h-[64px] flex-col items-center justify-center text-center">
         {plan.is_popular && (
@@ -134,18 +142,17 @@ function SliderCard({ plan, duration }: { plan: Plan; duration: Duration }) {
         ))}
       </ul>
 
-      <BuyButton />
+      <BuyButton onClick={() => onBuyNow(plan)} />
     </div>
   );
 }
 
 // ── Business grid card ──────────────────────────────────────────────────────
-function BusinessCard({ plan, duration }: { plan: Plan; duration: Duration }) {
+function BusinessCard({ plan, duration, onBuyNow }: { plan: Plan; duration: Duration; onBuyNow: (plan: Plan) => void }) {
   return (
     <div
-      className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${
-        plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
-      }`}
+      className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
+        }`}
     >
       <h3 className="min-h-[32px] text-center text-lg font-bold text-gray-800 dark:text-white">{plan.name}</h3>
 
@@ -170,13 +177,13 @@ function BusinessCard({ plan, duration }: { plan: Plan; duration: Duration }) {
         ))}
       </ul>
 
-      <BuyButton />
+      <BuyButton onClick={() => onBuyNow(plan)} />
     </div>
   );
 }
 
 // ── Roaming card ────────────────────────────────────────────────────────────
-function RoamingCard({ plan }: { plan: Plan }) {
+function RoamingCard({ plan, onBuyNow }: { plan: Plan; onBuyNow: (plan: Plan) => void }) {
   return (
     <div className="flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-800">
       <h3 className="mb-4 text-center text-lg font-semibold text-gray-700 dark:text-gray-200">{plan.name}</h3>
@@ -200,7 +207,7 @@ function RoamingCard({ plan }: { plan: Plan }) {
         ))}
       </ul>
 
-      <BuyButton />
+      <BuyButton onClick={() => onBuyNow(plan)} />
     </div>
   );
 }
@@ -210,6 +217,9 @@ function RoamingCard({ plan }: { plan: Plan }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function Allplans() {
+  // const { addToCart } = useCart();
+  const { addPlanToCart } = useCart();
+  const router = useRouter();
   const [simDuration, setSimDuration] = useState<Duration>("24 Month Plan");
   const [bizDuration, setBizDuration] = useState<Duration>("24 Month Plan");
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -237,6 +247,11 @@ function Allplans() {
 
   const scrollBy = (dir: 1 | -1) => {
     scroller.current?.scrollBy({ left: dir * 344, behavior: "smooth" });
+  };
+
+  const handleBuyNow = (plan: Plan) => {
+    addPlanToCart(plan);
+    router.push("/checkout");
   };
 
   return (
@@ -283,7 +298,7 @@ function Allplans() {
                   className="flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth px-1 pb-4 pt-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                 >
                   {simPlans.map((plan) => (
-                    <SliderCard key={plan.id} plan={plan} duration={simDuration} />
+                    <SliderCard key={plan.id} plan={plan} duration={simDuration} onBuyNow={handleBuyNow} />
                   ))}
                 </div>
 
@@ -305,7 +320,7 @@ function Allplans() {
                 <DurationToggle duration={bizDuration} setDuration={setBizDuration} />
                 <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-3">
                   {businessPlans.map((plan) => (
-                    <BusinessCard key={plan.id} plan={plan} duration={bizDuration} />
+                    <BusinessCard key={plan.id} plan={plan} duration={bizDuration} onBuyNow={handleBuyNow} />
                   ))}
                 </div>
               </section>
@@ -317,7 +332,7 @@ function Allplans() {
                 <SectionHeading>Zoiko Roaming Deals</SectionHeading>
                 <div className="mx-auto grid max-w-4xl grid-cols-1 items-stretch gap-6 md:grid-cols-2">
                   {roamingPlans.map((plan) => (
-                    <RoamingCard key={plan.id} plan={plan} />
+                    <RoamingCard key={plan.id} plan={plan} onBuyNow={handleBuyNow} />
                   ))}
                 </div>
               </section>

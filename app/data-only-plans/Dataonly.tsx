@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCart } from "../context/Cartcontext";
 
 // .env.local -> NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
@@ -48,6 +50,14 @@ const Check = () => (
 );
 
 function PlanCard({ plan, duration }: { plan: Plan; duration: Duration }) {
+    const { addPlanToCart } = useCart();
+    const router = useRouter();
+  
+    const handleBuyNow = (plan: Plan) => {
+      addPlanToCart(plan);
+      router.push("/checkout");
+    };
+  
   return (
     <div className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${
       plan.is_popular ? "border-2 border-teal-400" : "border border-gray-100 dark:border-gray-700"
@@ -79,7 +89,7 @@ function PlanCard({ plan, duration }: { plan: Plan; duration: Duration }) {
         ))}
       </ul>
 
-      <button className="mt-auto w-full rounded-md bg-[#e6007e] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
+      <button onClick={() => handleBuyNow(plan)} className="mt-auto w-full rounded-md bg-[#e6007e] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
         Buy this plan
       </button>
     </div>
