@@ -41,7 +41,6 @@ function ProductDetail({ slug }: { slug: string }) {
   const [activeImg, setActiveImg] = useState(0);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [qty, setQty] = useState(1);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) {
@@ -109,36 +108,6 @@ function ProductDetail({ slug }: { slug: string }) {
   const inStock = !!matched && (matched.in_stock || Number(matched.stock) > 0);
   const price = matched ? Number(matched.price) : null;
   const canAdd = inStock;
-
-  // Write the matched variant into localStorage "cart" (merge by variant id),
-  // notify the header via a custom event, and show a success toast.
-  const addToCart = () => {
-    if (!product || !matched || !canAdd) return;
-    const primaryImg = product.images.find((im) => im.is_primary) ?? product.images[0];
-    const item = {
-      id: matched.id,
-      slug: product.slug,
-      name: product.name,
-      image: primaryImg ? absUrl(primaryImg.image) : null,
-      price: Number(matched.price),
-      qty,
-      attributes: matched.attributes_dict,
-    };
-    try {
-      const raw = JSON.parse(localStorage.getItem("cart") ?? "[]");
-      const cart: { id: number | string; qty: number }[] = Array.isArray(raw) ? raw : [];
-      const existing = cart.find((c) => c.id === item.id);
-      if (existing) existing.qty = Number(existing.qty || 0) + qty;
-      else cart.push(item);
-      localStorage.setItem("cart", JSON.stringify(cart));
-      // tell the header (same tab) to refresh its badge
-      window.dispatchEvent(new Event("cart-updated"));
-    } catch {
-      /* ignore storage errors */
-    }
-    setToast("Added to cart successfully");
-    window.setTimeout(() => setToast(null), 2500);
-  };
 
   if (loading) {
     return (
@@ -242,33 +211,14 @@ function ProductDetail({ slug }: { slug: string }) {
             />
             <button
               type="button"
-              onClick={addToCart}
               disabled={!canAdd}
               className="rounded-md bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
             >
               Add to cart
             </button>
           </div>
-
-          {/* Inline success message */}
-          {toast && (
-            <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-green-600">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/40">
-                <svg viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3"><path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.1 3.1 6.8-6.8a1 1 0 011.4 0z" clipRule="evenodd" /></svg>
-              </span>
-              {toast}
-            </p>
-          )}
         </div>
       </div>
-
-      {/* Floating toast (bottom-right) */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white shadow-lg dark:bg-gray-700">
-          <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-green-400"><path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.1 3.1 6.8-6.8a1 1 0 011.4 0z" clipRule="evenodd" /></svg>
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

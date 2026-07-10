@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCart } from "../context/Cartcontext";
 
 // .env.local -> NEXT_PUBLIC_API_URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
@@ -54,12 +56,12 @@ function SectionHead({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PlanCard({ plan, badge }: { plan: Plan; badge?: string }) {
+function PlanCard({ plan, badge, onBuyNow }: { plan: Plan; badge?: string; onBuyNow: (plan: Plan) => void }) {
   const highlighted = plan.is_popular || !!badge;
+
   return (
-    <div className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${
-      highlighted ? "border-2 border-teal-500" : "border border-gray-100 dark:border-gray-700"
-    }`}>
+    <div className={`relative flex h-full flex-col rounded-2xl bg-white p-6 shadow-md dark:bg-gray-800 ${highlighted ? "border-2 border-teal-500" : "border border-gray-100 dark:border-gray-700"
+      }`}>
       {highlighted && badge && (
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-teal-600 px-3 py-0.5 text-xs font-semibold text-white">
           {badge}
@@ -88,10 +90,10 @@ function PlanCard({ plan, badge }: { plan: Plan; badge?: string }) {
       </ul>
 
       <div className="mt-auto space-y-2">
-        <button className="w-full rounded-md border border-green-600 py-2 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700">
+        {/* <button className="w-full rounded-md border border-green-600 py-2 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700">
           View Details
-        </button>
-        <button className="w-full rounded-md bg-[#e6007e] py-2 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
+        </button> */}
+        <button onClick={() => onBuyNow(plan)} className="w-full rounded-md bg-[#e6007e] py-2 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
           Buy this plan
         </button>
       </div>
@@ -108,6 +110,13 @@ function ThirtyDayPlans() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
+  const { addPlanToCart } = useCart();
+  const router = useRouter();
+
+  const handleBuyNow = (plan: Plan) => {
+    addPlanToCart(plan);
+    router.push("/checkout");
+  };
 
   useEffect(() => {
     (async () => {
@@ -161,7 +170,7 @@ function ThirtyDayPlans() {
                 <div className="flex flex-wrap justify-center gap-6">
                   {noContract.map((p) => (
                     <div key={p.id} className="w-full max-w-[340px] sm:w-[320px]">
-                      <PlanCard plan={p} badge={p.is_popular ? "Best Value" : undefined} />
+                      <PlanCard plan={p} badge={p.is_popular ? "Best Value" : undefined} onBuyNow={handleBuyNow} />
                     </div>
                   ))}
                 </div>
@@ -184,7 +193,7 @@ function ThirtyDayPlans() {
                   <div ref={sliderRef} className={`flex snap-x gap-6 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${dataOnly.length <= 3 ? "justify-center" : ""}`}>
                     {dataOnly.map((p) => (
                       <div key={p.id} className="w-[300px] shrink-0 snap-start">
-                        <PlanCard plan={p} />
+                        <PlanCard plan={p} onBuyNow={handleBuyNow} />
                       </div>
                     ))}
                   </div>
@@ -199,7 +208,7 @@ function ThirtyDayPlans() {
                 <div className="flex flex-wrap justify-center gap-6">
                   {roaming.map((p) => (
                     <div key={p.id} className="w-full max-w-[400px] sm:w-[380px]">
-                      <PlanCard plan={p} />
+                      <PlanCard plan={p} onBuyNow={handleBuyNow} />
                     </div>
                   ))}
                 </div>
@@ -214,6 +223,9 @@ function ThirtyDayPlans() {
             <div className="grid items-center gap-6 md:grid-cols-[1fr_auto]">
               <div>
                 <p className="text-sm italic leading-relaxed text-gray-600 dark:text-gray-300">
+
+
+                  test
                   &ldquo;Brilliant service. From the moment I downloaded their app, accessing their brilliant
                   customer services has been a pleasure. Not only is it incredibly user-friendly, but its pricing is
                   also very competitive compared to other options in the market. I can confidently say that Zoiko

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Menu, X, ChevronDown, Search, ShoppingCart, LayoutDashboard, LogOut } from "lucide-react";
+import { useCart } from "../context/Cartcontext";
 
 // Top utility bar links
 const topLinks = [
@@ -61,7 +62,7 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
+  const { totalItems } = useCart();
 
   // Read auth state from localStorage on mount + keep it in sync
   useEffect(() => {
@@ -77,28 +78,6 @@ export default function Header() {
       window.removeEventListener("zoiko-auth", check);
       window.removeEventListener("storage", check);
       window.removeEventListener("focus", check);
-    };
-  }, []);
-
-  
-  useEffect(() => {
-    const readCart = () => {
-      try {
-        const raw = JSON.parse(localStorage.getItem("cart") ?? "[]");
-        const items: { qty?: number }[] = Array.isArray(raw) ? raw : [];
-        setCartCount(items.reduce((n, it) => n + Math.max(1, Number(it.qty ?? 1) || 1), 0));
-      } catch {
-        setCartCount(0);
-      }
-    };
-    readCart();
-    window.addEventListener("cart-updated", readCart);
-    window.addEventListener("storage", readCart);
-    window.addEventListener("focus", readCart);
-    return () => {
-      window.removeEventListener("cart-updated", readCart);
-      window.removeEventListener("storage", readCart);
-      window.removeEventListener("focus", readCart);
     };
   }, []);
 
@@ -120,11 +99,10 @@ export default function Header() {
             <Link
               key={l.label}
               href={l.href}
-              className={`text-sm transition-colors hover:text-[#0e8f74] ${
-                l.highlight
+              className={`text-sm transition-colors hover:text-[#0e8f74] ${l.highlight
                   ? "font-bold text-gray-900 dark:text-white"
                   : "text-gray-600 dark:text-gray-400"
-              }`}
+                }`}
             >
               {l.label}
             </Link>
@@ -211,15 +189,25 @@ export default function Header() {
               <Search size={20} />
             </button>
 
-            <Link
-              href="/checkout"
-              aria-label={`Cart${cartCount ? `, ${cartCount} items` : ""}`}
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+            {/* Cart icon */}
+            {/* <Link
+              href="/cart"
+              aria-label="Cart"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
             >
               <ShoppingCart size={20} />
-              {cartCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#e6007e] px-1 text-[11px] font-bold leading-none text-white">
-                  {cartCount > 99 ? "99+" : cartCount}
+            </Link> */}
+
+            <Link
+              href="/checkout"
+              aria-label="Cart"
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-700 transition-colors dark:text-gray-200"
+            >
+              <ShoppingCart size={20} />
+
+              {totalItems > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-semibold text-white">
+                  {totalItems}
                 </span>
               )}
             </Link>
@@ -329,11 +317,10 @@ export default function Header() {
                 key={l.label}
                 href={l.href}
                 onClick={() => setMobileOpen(false)}
-                className={`block border-b border-gray-100 px-5 py-3 text-sm last:border-0 active:bg-gray-100 dark:border-gray-700 dark:active:bg-gray-700 ${
-                  l.highlight
+                className={`block border-b border-gray-100 px-5 py-3 text-sm last:border-0 active:bg-gray-100 dark:border-gray-700 dark:active:bg-gray-700 ${l.highlight
                     ? "font-bold text-gray-900 dark:text-white"
                     : "text-gray-600 dark:text-gray-300"
-                }`}
+                  }`}
               >
                 {l.label}
               </Link>
