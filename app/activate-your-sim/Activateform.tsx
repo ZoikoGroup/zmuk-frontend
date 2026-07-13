@@ -316,7 +316,7 @@ function Activateform() {
             <Link
               href="/account"
               className="rounded bg-[#1d6fd8] py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-[#175bb5]"
-            >s
+            >
               Back to My Account
             </Link>
           </div>
