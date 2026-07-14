@@ -9,6 +9,9 @@ const CLIENT_SECRET = process.env.TRANSATEL_CLIENT_SECRET ?? "";
 
 const TOKEN_URL = `${BASE}/authentication/api/token`;
 
+// Base URL with any trailing slashes stripped — used by the catch-all proxy.
+export const TRANSATEL_BASE = BASE.replace(/\/+$/, "");
+
 // Simple in-memory token cache (per server instance).
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
@@ -58,6 +61,12 @@ async function getAccessToken(forceRefresh = false): Promise<string> {
   return token;
 }
 
+// Public token getter — reused by the /token debug route and the [...path] proxy.
+// Pass true to force a fresh token (e.g. after an upstream 401).
+export function getTransatelToken(forceRefresh = false): Promise<string> {
+  return getAccessToken(forceRefresh);
+}
+
 async function authedGet(url: string): Promise<unknown> {
   const doFetch = async () =>
     fetch(url, {
@@ -73,6 +82,9 @@ async function authedGet(url: string): Promise<unknown> {
     await getAccessToken(true); // token stale — refresh once and retry
     res = await doFetch();
   }
+  // NOTE: Transatel returns 400 (not 404) for an unknown SIM, with a body like
+  // { detail: "Invalid SIM serial / SIM card doesn't belong to customer" }.
+  // We pass the real status + upstream body up; the client hook decides how to read it.
   if (res.status === 404) throw new TransatelError("Not found in Transatel.", 404, await safeJson(res));
   if (!res.ok) throw new TransatelError("Transatel request failed.", res.status, await safeJson(res));
   return res.json();
@@ -80,18 +92,19 @@ async function authedGet(url: string): Promise<unknown> {
 
 // Endpoint 3 — eSIM details by SIM serial (ICCID)
 export function getEsimDetails(simSerial: string, history = true) {
-  const url = `${BASE}/sim-management/sims/api/esims/sim-serial/${simSerial}${history ? "?history=true" : ""}`;
+  const url = `${BASE}/sim-management/sims/api/esims/sim-serial/${simSerial}${history ? "?history=true" : "?history=false"}`;
   return authedGet(url);
 }
 
-// Endpoint 4 — subscriber details by SIM serial (ICCID)
+// Endpoint 2 — subscriber details by SIM serial (ICCID)
 export function getSubscriberDetails(simSerial: string) {
   const url = `${BASE}/connectivity-management/subscribers/api/subscribers/sim-serial/${simSerial}`;
   return authedGet(url);
 }
 
+// Server-side rule from Transatel: simSerial must match [0-9]{13,20}
 export function validSerial(s: string): boolean {
-  return !!s && /^\d{15,22}$/.test(s);
+  return !!s && /^\d{13,20}$/.test(s);
 }
 
 async function safeJson(res: Response): Promise<unknown> {

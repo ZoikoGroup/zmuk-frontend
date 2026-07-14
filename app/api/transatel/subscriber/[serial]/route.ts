@@ -1,9 +1,12 @@
 // app/api/transatel/subscriber/[serial]/route.ts
 import { NextResponse } from "next/server";
-import { getSubscriberDetails, validSerial, TransatelError } from "../../../../../lib/transatel";
+import { getSubscriberDetails, validSerial, TransatelError } from "@/lib/transatel";
+
+export const runtime = "nodejs";        // Buffer + in-memory token cache need Node, not Edge
+export const dynamic = "force-dynamic"; // never cache a live lookup
 
 export async function GET(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ serial: string }> }
 ) {
   const { serial } = await params;
