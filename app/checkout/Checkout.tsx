@@ -7,21 +7,27 @@ import { ShoppingCart, Trash2, Plus, Minus, Loader2, ShieldCheck } from "lucide-
 // .env.local -> NEXT_PUBLIC_API_URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 // Orders are stored by the `orders` app (BqOrder.raw_data). Mounted at /api/v1/.
-const ORDER_URL = `${API_BASE}/api/v1/bqorders/`;
+const ORDER_URL = `${API_BASE}/api/v1/bqorders/`;            // device/product orders (BqOrder)
+const SIM_ORDER_URL = `${API_BASE}/api/sim/checkout-order/`; // SIM orders (sim_orders app)
 const CART_KEY = "cart";
 
-// ── Cart item shape (what the product page should write into localStorage "cart") ──
+// ── Cart item shape ──
+// `type` distinguishes a SIM plan ("plan") from a device ("product").
+// `simType` (eSIM/pSIM) is only meaningful for SIM plans and comes from the
+// Choose SIM Type modal (stored on the cart item's metadata).
 interface CartItem {
-  id: number | string;              // variant id (or product id)
+  id: number | string;
   slug: string;
   name: string;
   image: string | null;
-  price: number;                    // unit price
+  price: number;
   qty: number;
-  attributes?: Record<string, string>; // e.g. { Condition, Color, Storage }
+  type?: "plan" | "product";
+  simType?: "esim" | "psim";
+  attributes?: Record<string, string>;
 }
 
-// Defensive normaliser (handles slightly different stored shapes)
+// Defensive normaliser (handles the Cartcontext shape + older shapes)
 function normalise(raw: unknown): CartItem | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -29,6 +35,14 @@ function normalise(raw: unknown): CartItem | null {
   const qty = Math.max(1, Number(o.qty ?? o.quantity ?? 1) || 1);
   const name = String(o.name ?? o.planTitle ?? o.productName ?? "Item");
   if (!name) return null;
+
+  const type = o.type === "plan" || o.type === "product" ? (o.type as "plan" | "product") : undefined;
+
+  // simType may live on metadata.simType (Cartcontext) or directly on the item.
+  const meta = (o.metadata as Record<string, unknown>) ?? {};
+  const rawSim = meta.simType ?? o.simType;
+  const simType = rawSim === "esim" || rawSim === "psim" ? (rawSim as "esim" | "psim") : undefined;
+
   return {
     id: (o.id as number | string) ?? (o.variantId as number | string) ?? name,
     slug: String(o.slug ?? o.productSlug ?? ""),
@@ -36,11 +50,16 @@ function normalise(raw: unknown): CartItem | null {
     image: (o.image as string) ?? (o.primary_image as string) ?? null,
     price: isNaN(price) ? 0 : price,
     qty,
+    type,
+    simType,
     attributes: (o.attributes as Record<string, string>) ?? undefined,
   };
 }
 
 const money = (n: number) => `£${n.toFixed(2)}`;
+
+const simTypeLabel = (t?: "esim" | "psim") =>
+  t === "esim" ? "eSIM" : t === "psim" ? "pSIM (Physical)" : "";
 
 interface Customer {
   firstName: string; lastName: string; email: string; phone: string;
@@ -59,7 +78,6 @@ function Checkout() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<null | { id?: string | number }>(null);
 
-  // Load cart + prefill from stored user
   useEffect(() => {
     try {
       const rawCart = JSON.parse(localStorage.getItem(CART_KEY) ?? "[]");
@@ -87,7 +105,7 @@ function Checkout() {
   const persist = (items: CartItem[]) => {
     setCart(items);
     localStorage.setItem(CART_KEY, JSON.stringify(items));
-    window.dispatchEvent(new Event("zoiko-cart")); // let a cart badge update if you add one
+    window.dispatchEvent(new Event("zoiko-cart"));
   };
 
   const setQty = (idx: number, delta: number) => {
@@ -97,58 +115,124 @@ function Checkout() {
   const removeItem = (idx: number) => persist(cart.filter((_, i) => i !== idx));
 
   const subtotal = useMemo(() => cart.reduce((a, it) => a + it.price * it.qty, 0), [cart]);
+
+  // Shipping is required if there's any physical item: a device, or a pSIM.
+  // An order that is ONLY eSIMs needs no shipping address.
+  const shippingRequired = useMemo(
+    () => cart.some((it) => it.type === "product" || it.simType !== "esim"),
+    [cart]
+  );
+
   const shipping = 0; // free
   const total = subtotal + shipping;
 
-  const formValid =
-    customer.firstName && customer.lastName && /\S+@\S+\.\S+/.test(customer.email) &&
-    customer.phone && customer.address1 && customer.city && customer.postcode;
+  const baseValid =
+    customer.firstName && customer.lastName && /\S+@\S+\.\S+/.test(customer.email) && customer.phone;
+  const addressValid = customer.address1 && customer.city && customer.postcode;
+  const formValid = shippingRequired ? baseValid && addressValid : baseValid;
 
   const placeOrder = async () => {
     setError(null);
     if (cart.length === 0) { setError("Your cart is empty."); return; }
-    if (!formValid) { setError("Please fill in all required delivery details."); return; }
+    if (!formValid) {
+      setError(shippingRequired
+        ? "Please fill in all required contact and delivery details."
+        : "Please fill in your name, email and phone.");
+      return;
+    }
 
     setPlacing(true);
     try {
       const token = localStorage.getItem("zoiko_token");
-      const res = await fetch(ORDER_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Token ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          // shaped to match the orders app (bqorders/by-user reads these keys)
-          billingAddress: {
-            first_name: customer.firstName,
-            last_name: customer.lastName,
-            email: customer.email,        // by-user filters on this
-            phone: customer.phone,
-            address1: customer.address1,
-            address2: customer.address2,
-            city: customer.city,
-            postcode: customer.postcode,
-          },
-          cart: cart.map((it) => ({
-            id: it.id, slug: it.slug, name: it.name,
-            price: it.price, qty: it.qty, attributes: it.attributes ?? {},
-          })),
-          totals: { subtotal, shipping, discount: 0, total },
-          paymentMethod: "manual",
-          order_type: "device",
-        }),
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Token ${token}` } : {}),
+      };
+
+      const billingAddress = {
+        first_name: customer.firstName,
+        last_name: customer.lastName,
+        email: customer.email,
+        phone: customer.phone,
+        address1: customer.address1,
+        address2: customer.address2,
+        city: customer.city,
+        postcode: customer.postcode,
+      };
+
+      const mapLine = (it: CartItem) => ({
+        id: it.id, slug: it.slug, name: it.name,
+        price: it.price, qty: it.qty,
+        type: it.type ?? "plan",
+        simType: it.simType ?? null,
+        attributes: it.attributes ?? {},
       });
-      if (!res.ok) {
-        let msg = "Could not place your order. Please try again.";
-        try { const d = await res.json(); msg = d.detail ?? d.message ?? msg; } catch { /* ignore */ }
-        throw new Error(msg);
+
+      // Split the cart: SIM plans vs physical products/devices.
+      const simItems = cart.filter((it) => it.type !== "product");
+      const deviceItems = cart.filter((it) => it.type === "product");
+
+      const sum = (items: CartItem[]) => items.reduce((a, it) => a + it.price * it.qty, 0);
+
+      const requests: Promise<Response>[] = [];
+      const labels: string[] = [];
+
+      // Device/product order -> BqOrder (unchanged destination)
+      if (deviceItems.length > 0) {
+        const sub = sum(deviceItems);
+        labels.push("device");
+        requests.push(fetch(ORDER_URL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            billingAddress,
+            cart: deviceItems.map(mapLine),
+            totals: { subtotal: sub, shipping: 0, discount: 0, total: sub },
+            paymentMethod: "manual",
+            order_type: "device",
+          }),
+        }));
       }
-      const data = await res.json().catch(() => ({}));
+
+      // SIM order -> sim_orders app (separate SIM-orders table)
+      if (simItems.length > 0) {
+        const sub = sum(simItems);
+        labels.push("sim");
+        requests.push(fetch(SIM_ORDER_URL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            billingAddress,
+            cart: simItems.map(mapLine),
+            totals: { subtotal: sub, shipping: 0, discount: 0, total: sub },
+            paymentMethod: "manual",
+            order_type: "sim",
+          }),
+        }));
+      }
+
+      const responses = await Promise.all(requests);
+
+      // If any leg failed, report which one and stop.
+      const failed: string[] = [];
+      let lastId: string | number | undefined;
+      for (let i = 0; i < responses.length; i++) {
+        const res = responses[i];
+        if (!res.ok) {
+          failed.push(labels[i]);
+        } else {
+          const d = await res.json().catch(() => ({}));
+          lastId = d.id ?? d.order_id ?? d.order_ref ?? lastId;
+        }
+      }
+      if (failed.length > 0) {
+        throw new Error(`Could not place your ${failed.join(" & ")} order. Please try again.`);
+      }
+
       localStorage.removeItem(CART_KEY);
       window.dispatchEvent(new Event("zoiko-cart"));
       setCart([]);
-      setDone({ id: data.id ?? data.order_id });
+      setDone({ id: lastId });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not place your order.");
     } finally {
@@ -156,7 +240,6 @@ function Checkout() {
     }
   };
 
-  // ── Success screen ──
   if (done) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
@@ -190,26 +273,38 @@ function Checkout() {
         {loaded && cart.length === 0 && !done ? (
           <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <p className="text-gray-500 dark:text-gray-400">Your cart is empty.</p>
-            <Link href="/devices" className="mt-6 inline-block rounded-md border border-green-600 px-6 py-2.5 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700">
-              Browse devices
+            <Link href="/plans" className="mt-6 inline-block rounded-md border border-green-600 px-6 py-2.5 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700">
+              Browse plans
             </Link>
           </div>
         ) : (
           <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
 
-            {/* Left: delivery details */}
+            {/* Left: contact + (conditional) delivery details */}
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <h2 className="mb-5 text-lg font-bold text-gray-800 dark:text-white">Delivery details</h2>
+              <h2 className="mb-5 text-lg font-bold text-gray-800 dark:text-white">Your details</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div><label className={labelCx}>First name *</label><input className={inputCx} value={customer.firstName} onChange={set("firstName")} /></div>
                 <div><label className={labelCx}>Last name *</label><input className={inputCx} value={customer.lastName} onChange={set("lastName")} /></div>
                 <div><label className={labelCx}>Email *</label><input type="email" className={inputCx} value={customer.email} onChange={set("email")} /></div>
                 <div><label className={labelCx}>Phone *</label><input className={inputCx} value={customer.phone} onChange={set("phone")} /></div>
-                <div className="sm:col-span-2"><label className={labelCx}>Address line 1 *</label><input className={inputCx} value={customer.address1} onChange={set("address1")} /></div>
-                <div className="sm:col-span-2"><label className={labelCx}>Address line 2</label><input className={inputCx} value={customer.address2} onChange={set("address2")} /></div>
-                <div><label className={labelCx}>Town / City *</label><input className={inputCx} value={customer.city} onChange={set("city")} /></div>
-                <div><label className={labelCx}>Postcode *</label><input className={inputCx} value={customer.postcode} onChange={set("postcode")} /></div>
               </div>
+
+              {shippingRequired ? (
+                <>
+                  <h2 className="mb-4 mt-8 text-lg font-bold text-gray-800 dark:text-white">Delivery address</h2>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2"><label className={labelCx}>Address line 1 *</label><input className={inputCx} value={customer.address1} onChange={set("address1")} /></div>
+                    <div className="sm:col-span-2"><label className={labelCx}>Address line 2</label><input className={inputCx} value={customer.address2} onChange={set("address2")} /></div>
+                    <div><label className={labelCx}>Town / City *</label><input className={inputCx} value={customer.city} onChange={set("city")} /></div>
+                    <div><label className={labelCx}>Postcode *</label><input className={inputCx} value={customer.postcode} onChange={set("postcode")} /></div>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-6 rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-800 dark:border-teal-900 dark:bg-teal-950 dark:text-teal-300">
+                  Your order is eSIM only — no delivery address needed. We&rsquo;ll email your eSIM &amp; activation code.
+                </div>
+              )}
 
               {error && <div className="mt-5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
             </div>
@@ -228,7 +323,13 @@ function Checkout() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{it.name}</p>
-                      {it.attributes && (
+                      {/* SIM type badge (plans) or attributes (products) */}
+                      {it.type !== "product" && it.simType && (
+                        <span className="mt-0.5 inline-block rounded-full bg-[#e6007e]/10 px-2 py-0.5 text-xs font-medium text-[#e6007e]">
+                          {simTypeLabel(it.simType)}
+                        </span>
+                      )}
+                      {it.attributes && Object.values(it.attributes).filter(Boolean).length > 0 && (
                         <p className="truncate text-xs text-gray-400">
                           {Object.values(it.attributes).filter(Boolean).join(" · ")}
                         </p>
@@ -249,7 +350,7 @@ function Checkout() {
 
               <div className="mt-5 space-y-2 text-sm">
                 <div className="flex justify-between text-gray-600 dark:text-gray-300"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-                <div className="flex justify-between text-gray-600 dark:text-gray-300"><span>Shipping</span><span>{shipping === 0 ? "Free" : money(shipping)}</span></div>
+                <div className="flex justify-between text-gray-600 dark:text-gray-300"><span>Shipping</span><span>{shippingRequired ? (shipping === 0 ? "Free" : money(shipping)) : "—"}</span></div>
                 <div className="flex justify-between border-t border-gray-100 pt-3 text-base font-bold text-gray-900 dark:border-gray-700 dark:text-white"><span>Total</span><span>{money(total)}</span></div>
               </div>
 
