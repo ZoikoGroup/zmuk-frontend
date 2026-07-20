@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { ShoppingCart, Trash2, Plus, Minus, Loader2, ShieldCheck } from "lucide-react";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
+
+import StripePaymentForm, { StripePaymentFormRef } from "../components/StripePaymentForm";
 
 // .env.local -> NEXT_PUBLIC_API_URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -10,6 +14,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 const ORDER_URL = `${API_BASE}/api/v1/bqorders/`;            // device/product orders (BqOrder)
 const SIM_ORDER_URL = `${API_BASE}/api/sim/checkout-order/`; // SIM orders (sim_orders app)
 const CART_KEY = "cart";
+
+// Stripe publishable key -> .env.local -> NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+// loadStripe returns a promise; create the singleton once at module scope so it
+// is not re-created on every render.
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "");
 
 // ── Cart item shape ──
 // `type` distinguishes a SIM plan ("plan") from a device ("product").
@@ -77,6 +86,7 @@ function Checkout() {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<null | { id?: string | number }>(null);
+  const stripeFormRef = useRef<StripePaymentFormRef>(null);
 
   useEffect(() => {
     try {
@@ -143,6 +153,22 @@ function Checkout() {
 
     setPlacing(true);
     try {
+      // 1. Take payment FIRST. Only persist the order once Stripe confirms.
+      const pay = await stripeFormRef.current?.submitPayment({
+        amountGbp: total,
+        email: customer.email,
+        cartSummary: {
+          itemCount: cart.reduce((a, it) => a + it.qty, 0),
+          variationIds: cart
+            .map((it) => Number(it.id))
+            .filter((n) => Number.isFinite(n))
+            .slice(0, 30),
+        },
+      });
+      if (!pay) { throw new Error("Payment form is not ready. Please try again."); }
+      if (!pay.success) { throw new Error(pay.error || "Payment could not be completed."); }
+
+      // 2. Payment succeeded -> persist the order records.
       const token = localStorage.getItem("zoiko_token");
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -188,7 +214,7 @@ function Checkout() {
             billingAddress,
             cart: deviceItems.map(mapLine),
             totals: { subtotal: sub, shipping: 0, discount: 0, total: sub },
-            paymentMethod: "manual",
+            paymentMethod: "stripe",
             order_type: "device",
           }),
         }));
@@ -205,7 +231,7 @@ function Checkout() {
             billingAddress,
             cart: simItems.map(mapLine),
             totals: { subtotal: sub, shipping: 0, discount: 0, total: sub },
-            paymentMethod: "manual",
+            paymentMethod: "stripe",
             order_type: "sim",
           }),
         }));
@@ -226,7 +252,7 @@ function Checkout() {
         }
       }
       if (failed.length > 0) {
-        throw new Error(`Could not place your ${failed.join(" & ")} order. Please try again.`);
+        throw new Error(`Payment succeeded but we could not save your ${failed.join(" & ")} order. Please contact support.`);
       }
 
       localStorage.removeItem(CART_KEY);
@@ -354,13 +380,34 @@ function Checkout() {
                 <div className="flex justify-between border-t border-gray-100 pt-3 text-base font-bold text-gray-900 dark:border-gray-700 dark:text-white"><span>Total</span><span>{money(total)}</span></div>
               </div>
 
+              {/* Payment — the PaymentElement MUST live inside <Elements>. */}
+              {total > 0 && (
+                <div className="mt-6">
+                  <h2 className="mb-3 text-lg font-bold text-gray-800 dark:text-white">Payment</h2>
+                  <Elements
+                    stripe={stripePromise}
+                    options={{
+                      mode: "payment",
+                      amount: Math.round(total * 100), // integer pence
+                      currency: "gbp",
+                      appearance: {
+                        theme: "stripe",
+                        variables: { colorPrimary: "#e6007e" },
+                      },
+                    }}
+                  >
+                    <StripePaymentForm ref={stripeFormRef} />
+                  </Elements>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={placeOrder}
                 disabled={placing || cart.length === 0}
                 className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-[#e6007e] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a] disabled:opacity-60"
               >
-                {placing ? <><Loader2 className="h-4 w-4 animate-spin" /> Placing order…</> : "Place order"}
+                {placing ? <><Loader2 className="h-4 w-4 animate-spin" /> Placing order…</> : `Pay ${money(total)}`}
               </button>
 
               <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-gray-400">
