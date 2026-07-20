@@ -2,204 +2,123 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { fetchSubscriber, fetchEsim } from "../../lib/useTransatel";
+import { useEffect, useState, type FormEvent } from "react";
 
-// .env.local -> NEXT_PUBLIC_API_URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+// Base URL from env (NEXT_PUBLIC_API_URL). Paths built inline.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-interface Plan {
-  id: number;
+type Module = {
+  key: string;
   name: string;
-  slug: string;
-  price: string;
-  price_30: string | null;
-  price_12: string | null;
-  price_24: string | null;
-  data_allowance: string | null;
-  short_description: string | null;
-  category: { id: number; name: string; slug: string } | null;
-  features: { id: number; title: string }[];
-}
+  category: string;
+  shortcode: string;
+  enabled: boolean;
+  status: "Enabled" | "Disabled";
+};
 
-// Subscriber shape from Transatel (only the bits we display; rest ignored)
-interface Subscriber {
-  msisdn?: string;
-  simSerial?: string;
-  iccid?: string;
-  status?: string;
-  [k: string]: unknown;
-}
+type Phase = "idle" | "starting" | "redirecting" | "error";
+type Step = "phone" | "amount";
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-// Recharge = monthly top-up, so prefer the 30-day price.
-function topupPrice(p: Plan): string {
-  return Number(p.price_30 ?? p.price_12 ?? p.price).toFixed(2);
-}
-
-// Mask a SIM serial like the screenshot: 89**************202
-function maskSerial(serial?: string): string {
-  if (!serial) return "—";
-  if (serial.length <= 5) return serial;
-  return serial.slice(0, 2) + "*".repeat(Math.max(3, serial.length - 5)) + serial.slice(-3);
-}
-
-const Check = () => (
-  <svg className="mt-0.5 h-4 w-4 shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-    <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.1 3.1 6.8-6.8a1 1 0 011.4 0z" clipRule="evenodd" />
-  </svg>
-);
-
-// ─── PAGE ─────────────────────────────────────────────────────────────────────
+const PRESET_AMOUNTS = ["5", "10", "15", "20", "30"];
 
 function Recharge() {
+  const [step, setStep] = useState<Step>("phone");
+
+  const [modules, setModules] = useState<Module[]>([]);
+  const [module, setModule] = useState<string>("recharge");
   const [phone, setPhone] = useState("");
-
-  // validation state
-  const [checking, setChecking] = useState(false);
-  const [validated, setValidated] = useState(false);
+  const [amount, setAmount] = useState("10");
+  const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [sub, setSub] = useState<Subscriber | null>(null);
 
-  // plans
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [plansLoading, setPlansLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-
-  // recharge submit
-  const [recharging, setRecharging] = useState(false);
-  const [done, setDone] = useState(false);
+  // Load the enabled modules (Recharge / Top Up / Pending Bill) from the backend.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/recharge/modules/`);
+        const data: Module[] = await res.json();
+        if (!alive) return;
+        const enabled = data.filter((m) => m.enabled);
+        setModules(enabled);
+        if (enabled.length && !enabled.some((m) => m.key === module)) {
+          setModule(enabled[0].key);
+        }
+      } catch {
+        /* modules are optional for the form to work; ignore load errors */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const digits = phone.replace(/\D/g, "");
-  const canValidate = digits.length >= 10; // UK MSISDN
+  const phoneValid = digits.length >= 7;
+  const amountNum = Number(amount);
+  const amountValid = amountNum >= 1 && amountNum <= 100;
 
-  // Reset everything if the number is edited after validating.
-  const onPhoneChange = (v: string) => {
-    setPhone(v);
-    if (validated || error) {
-      setValidated(false);
-      setSub(null);
-      setError(null);
-      setSelectedPlan(null);
-      setPlans([]);
-    }
-  };
+  const busy = phase === "starting" || phase === "redirecting";
 
-  const loadPlans = async () => {
-    setPlansLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/plans/v1/`);
-      if (res.ok) {
-        const data = await res.json();
-        const list: Plan[] = Array.isArray(data) ? data : data.results ?? [];
-        // Top-up plans = SIM-only / 30-day style plans (skip broadband/phone-line).
-        const topups = list.filter(
-          (p) => !/broadband|digital-phone|phone-line/i.test(p.category?.slug ?? "")
-        );
-        setPlans(topups.length ? topups : list);
-      }
-    } catch {
-      /* plans are optional; validation still succeeded */
-    } finally {
-      setPlansLoading(false);
-    }
-  };
-
-  // Validate the MSISDN against Transatel (subscriber → fallback eSIM).
-  const validate = async () => {
-    if (!canValidate) return;
-    setChecking(true);
+  // Step 1 -> just advance to the amount step (no payment yet).
+  const goToAmount = (e: FormEvent) => {
+    e.preventDefault();
     setError(null);
-    setValidated(false);
-    setSub(null);
-    setSelectedPlan(null);
-
-    const s = await fetchSubscriber(digits);
-    if (s.error) { setError(s.error); setChecking(false); return; }
-
-    if (s.found) {
-      const d = s.data as Subscriber;
-      setSub({
-        msisdn: d.msisdn ?? `+${digits}`,
-        simSerial: d.simSerial ?? d.iccid ?? (d as Record<string, string>).sim_serial,
-        status: d.status,
-      });
-      setValidated(true);
-      setChecking(false);
-      loadPlans();
-      return;
-    }
-
-    // Not an active subscriber — try the eSIM record for the serial/status.
-    const e = await fetchEsim(digits);
-    if (e.found) {
-      const d = e.data as Subscriber;
-      setSub({ msisdn: `+${digits}`, simSerial: d.simSerial ?? d.iccid, status: d.status });
-      setValidated(true);
-      setChecking(false);
-      loadPlans();
-    } else {
-      setError("We couldn't find an active SIM for that number. Please check and try again.");
-      setChecking(false);
-    }
+    if (!phoneValid) return;
+    setStep("amount");
   };
 
-  const rechargeNow = async () => {
-    if (!validated || !selectedPlan) return;
-    setRecharging(true);
+  // Step 2 -> create the Stripe Checkout session and redirect.
+  const startPayment = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!phoneValid || !amountValid) return;
+
+    setPhase("starting");
     try {
-      // Reuse the orders endpoint (same one the checkout uses).
-      const res = await fetch(`${API_BASE}/api/v1/bqorders/`, {
+      const res = await fetch(`${API_BASE}/api/recharge/create/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          order_type: "recharge",
-          msisdn: sub?.msisdn ?? `+${digits}`,
-          sim_serial: sub?.simSerial ?? null,
-          plan: { id: selectedPlan.id, name: selectedPlan.name, price: topupPrice(selectedPlan) },
-          totals: { total: Number(topupPrice(selectedPlan)) },
-          paymentMethod: "manual",
+          msisdn: phone.trim(),
+          module,
+          amount: amountNum.toFixed(2),
+          success_url: `${window.location.origin}/recharge/success`,
+          cancel_url: `${window.location.origin}/recharge`,
         }),
       });
-      if (!res.ok) throw new Error();
-      setDone(true);
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.checkout_url) {
+        setPhase("redirecting");
+        // Hand off to Stripe's hosted, SCA-compliant checkout page.
+        window.location.href = data.checkout_url as string;
+        return;
+      }
+
+      setPhase("error");
+      setError((data && data.detail) || `Could not start payment (status ${res.status}).`);
     } catch {
-      setError("Recharge could not be completed. Please try again.");
-    } finally {
-      setRecharging(false);
+      setPhase("error");
+      setError("Could not reach the server. Please try again.");
     }
   };
 
-  // ─── Success screen ───
-  if (done) {
-    return (
-      <main className="bg-white px-4 py-20 text-center font-sans dark:bg-gray-900">
-        <div className="mx-auto max-w-md">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/40">
-            <Check />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Recharge submitted!</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            {selectedPlan?.name} for {sub?.msisdn}. You'll receive confirmation shortly.
-          </p>
-          <Link href="/" className="mt-8 inline-block rounded-md bg-[#e6007e] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#c4007a]">
-            Back to Home
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  const pinkInput =
+    "mt-2 w-full rounded-md border border-[#e6007e]/60 px-4 py-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#e6007e] focus:outline-none focus:ring-1 focus:ring-[#e6007e] disabled:opacity-60 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500";
 
   return (
     <main className="relative bg-white font-sans dark:bg-gray-900">
-      {/* ─── "Get in touch" side tab ─── */}
-      <Link href="" className="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-lg bg-[#e6007e] px-2 py-4 text-xs font-semibold text-white shadow-lg [writing-mode:vertical-rl] hover:bg-[#c4007a]">
+      <Link
+        href=""
+        className="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-lg bg-[#e6007e] px-2 py-4 text-xs font-semibold text-white shadow-lg [writing-mode:vertical-rl] hover:bg-[#c4007a]"
+      >
         Get in touch
       </Link>
 
-      {/* ─── Hero banner ─── */}
+      {/* Hero banner */}
       <section className="w-full">
         <Image
           src="/images/topup/Rectangle 41673.png"
@@ -212,112 +131,141 @@ function Recharge() {
         />
       </section>
 
-      {/* ─── Recharge flow ─── */}
       <section className="bg-white px-4 py-16 sm:px-6 md:px-8 dark:bg-gray-900">
-        <div className="mx-auto max-w-2xl">
-          {/* Phone number */}
-          <label htmlFor="msisdn" className="block text-sm font-semibold text-gray-800 dark:text-gray-100">
-            Phone Number (MSISDN) <span className="text-[#e6007e]">*</span>
-          </label>
-          <input
-            id="msisdn"
-            type="tel"
-            inputMode="tel"
-            value={phone}
-            onChange={(e) => onPhoneChange(e.target.value)}
-            placeholder="enter your phone number"
-            className="mt-2 w-full rounded-md border border-[#e6007e]/60 px-4 py-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-[#e6007e] focus:outline-none focus:ring-1 focus:ring-[#e6007e] dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
-          />
+        {step === "phone" ? (
+          // -- STEP 1: phone only (matches the live page) --
+          <form onSubmit={goToAmount} className="mx-auto max-w-xl">
+            <label htmlFor="msisdn" className="block text-sm font-semibold text-gray-800 dark:text-gray-100">
+              Phone Number (MSISDN) <span className="text-[#e6007e]">*</span>
+            </label>
+            <input
+              id="msisdn"
+              type="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Enter your phone number"
+              className={pinkInput}
+            />
 
-          {/* Validate button (until validated) */}
-          {!validated && (
             <button
-              type="button"
-              onClick={validate}
-              disabled={!canValidate || checking}
-              className={`mt-4 rounded-md px-6 py-2.5 text-sm font-semibold transition-colors ${
-                canValidate && !checking ? "bg-[#e6007e] text-white hover:bg-[#c4007a]" : "cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500"
+              type="submit"
+              disabled={!phoneValid}
+              className={`mt-6 w-full rounded-md px-6 py-3 text-sm font-semibold transition-colors sm:w-auto ${
+                phoneValid
+                  ? "bg-[#e6007e] text-white hover:bg-[#c4007a]"
+                  : "cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500"
               }`}
             >
-              {checking ? "Validating…" : "Validate Number"}
+              Recharge Now
             </button>
-          )}
-
-          {/* Messages */}
-          {error && <p className="mt-3 text-sm font-medium text-red-500">{error}</p>}
-          {validated && <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-green-600"><Check /> Phone number validated successfully!</p>}
-
-          {/* SIM Details */}
-          {validated && sub && (
-            <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="border-b border-gray-100 bg-gray-50 px-5 py-3 text-lg font-bold text-[#0e7490] dark:border-gray-700 dark:bg-gray-800 dark:text-cyan-300">
-                SIM Details
+          </form>
+        ) : (
+          // -- STEP 2: choose the amount, then pay --
+          <form onSubmit={startPayment} className="mx-auto max-w-xl">
+            {/* Which number we're recharging + change link back to step 1 */}
+            <div className="mb-6 flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Recharging</p>
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{phone}</p>
               </div>
-              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 text-sm dark:border-gray-700">
-                <span className="font-bold text-gray-800 dark:text-gray-100">Phone Number:</span>
-                <span className="text-gray-600 dark:text-gray-300">{sub.msisdn}</span>
-              </div>
-              <div className="flex items-center justify-between px-5 py-4 text-sm">
-                <span className="font-bold text-gray-800 dark:text-gray-100">SIM Card ID:</span>
-                <span className="text-gray-600 dark:text-gray-300">{maskSerial(sub.simSerial)}</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => { setStep("phone"); setPhase("idle"); setError(null); }}
+                disabled={busy}
+                className="text-sm font-semibold text-[#e6007e] hover:underline disabled:opacity-60"
+              >
+                Change
+              </button>
             </div>
-          )}
 
-          {/* Plan selection */}
-          {validated && (
-            <div className="mt-8">
-              <h2 className="text-lg font-bold text-gray-800 dark:text-white">Choose a plan</h2>
-              {plansLoading ? (
-                <div className="mt-6 flex justify-center">
-                  <div className="h-7 w-7 animate-spin rounded-full border-4 border-[#e6007e] border-t-transparent" role="status"><span className="sr-only">Loading plans…</span></div>
+            {/* Service tabs -- only if more than one module is enabled */}
+            {modules.length > 1 && (
+              <div className="mb-6">
+                <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">Service</span>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {modules.map((m) => (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => setModule(m.key)}
+                      disabled={busy}
+                      className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                        module === m.key
+                          ? "border-[#e6007e] bg-[#e6007e] text-white"
+                          : "border-gray-300 text-gray-600 hover:border-[#e6007e] dark:border-gray-600 dark:text-gray-300"
+                      }`}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
                 </div>
-              ) : plans.length === 0 ? (
-                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">No plans available right now.</p>
-              ) : (
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {plans.map((p) => {
-                    const active = selectedPlan?.id === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setSelectedPlan(p)}
-                        className={`rounded-xl border p-5 text-left transition-colors ${
-                          active ? "border-[#e6007e] ring-2 ring-[#e6007e]/30" : "border-gray-200 hover:border-[#e6007e]/50 dark:border-gray-700"
-                        } bg-white dark:bg-gray-800`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-gray-800 dark:text-white">{p.name}</span>
-                          {active && <span className="text-[#e6007e]"><Check /></span>}
-                        </div>
-                        {p.data_allowance && <p className="mt-1 text-sm font-semibold text-green-600">{p.data_allowance} data</p>}
-                        <p className="mt-2 text-xl font-extrabold text-[#e6007e]">£{topupPrice(p)}<span className="text-xs font-normal text-gray-400"> / month</span></p>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              </div>
+            )}
+
+            <label htmlFor="amount" className="block text-sm font-semibold text-gray-800 dark:text-gray-100">
+              Amount (£) <span className="text-[#e6007e]">*</span>
+            </label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {PRESET_AMOUNTS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setAmount(a)}
+                  disabled={busy}
+                  className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                    amount === a
+                      ? "border-[#e6007e] bg-[#e6007e] text-white"
+                      : "border-gray-300 text-gray-600 hover:border-[#e6007e] dark:border-gray-600 dark:text-gray-300"
+                  }`}
+                >
+                  £{a}
+                </button>
+              ))}
             </div>
-          )}
+            <input
+              id="amount"
+              type="number"
+              min={1}
+              max={100}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              disabled={busy}
+              className="mt-2 w-full rounded-md border border-[#e6007e]/60 px-4 py-3 text-sm text-gray-700 focus:border-[#e6007e] focus:outline-none focus:ring-1 focus:ring-[#e6007e] disabled:opacity-60 dark:bg-gray-800 dark:text-gray-100"
+            />
 
-          {/* Recharge Now */}
-          <button
-            type="button"
-            onClick={rechargeNow}
-            disabled={!validated || !selectedPlan || recharging}
-            className={`mt-8 rounded-md px-6 py-2.5 text-sm font-semibold transition-colors ${
-              validated && selectedPlan && !recharging ? "bg-[#e6007e] text-white hover:bg-[#c4007a]" : "cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500"
-            }`}
-          >
-            {recharging ? "Processing…" : "Recharge Now"}
-          </button>
-        </div>
+            {error && (
+              <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={!amountValid || busy}
+              className={`mt-6 w-full rounded-md px-6 py-3 text-sm font-semibold transition-colors sm:w-auto ${
+                amountValid && !busy
+                  ? "bg-[#e6007e] text-white hover:bg-[#c4007a]"
+                  : "cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500"
+              }`}
+            >
+              {phase === "starting"
+                ? "Starting secure checkout…"
+                : phase === "redirecting"
+                ? "Redirecting to payment…"
+                : `Recharge £${amountValid ? amountNum.toFixed(2) : "0.00"}`}
+            </button>
+
+            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+              Payments are processed securely by Stripe. You&rsquo;ll be redirected to a secure checkout page.
+            </p>
+          </form>
+        )}
       </section>
     </main>
   );
 }
 
-// Exported both ways so either default or named import works.
 export default Recharge;
 export { Recharge };
