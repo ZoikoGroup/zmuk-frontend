@@ -1,6 +1,6 @@
 export const isLoggedIn = () => {
   if (typeof window === "undefined") return false;
-  return !!localStorage.getItem("driverx_token");
+  return !!localStorage.getItem("token");
 };
 
 export const getUser = () => {
@@ -10,7 +10,7 @@ export const getUser = () => {
 };
 
 export const logout = async () => {
-  localStorage.removeItem("driverx_token");
+  localStorage.removeItem("token");
   localStorage.removeItem("user");
   try {
     const { signOut } = await import('next-auth/react');
@@ -19,3 +19,16 @@ export const logout = async () => {
     window.location.href = '/login';
   }
 };
+
+export const getToken = () => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("token");
+  }
+  return null;
+};
+
+export const isAuthenticated = () => {
+  return !!getToken();
+};
+
+
