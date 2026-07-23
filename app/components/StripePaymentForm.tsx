@@ -9,16 +9,12 @@ import { forwardRef, useImperativeHandle, useState } from "react";
 
 export type StripePaymentFormRef = {
   /**
-   * Validates the PaymentElement, creates a PaymentIntent on the server for
-   * the given amount, then confirms the payment. Returns success/error so the
-   * caller can decide whether to proceed with persisting the order.
+   * Validates the PaymentElement, then confirms the payment against the
+   * PaymentIntent that `<Elements clientSecret={...}>` was already mounted
+   * with (created up front by the checkout page). Returns success/error so
+   * the caller can decide whether to proceed with persisting the order.
    */
-  submitPayment: (args: {
-    /** Amount to charge, in decimal pounds (e.g. 12.99). */
-    amountGbp: number;
-    email?: string;
-    cartSummary?: { itemCount: number; variationIds: number[] };
-  }) => Promise<{ success: boolean; error?: string }>;
+  submitPayment: () => Promise<{ success: boolean; error?: string }>;
 };
 
 interface StripePaymentFormProps {
@@ -34,7 +30,7 @@ const StripePaymentForm = forwardRef<StripePaymentFormRef, StripePaymentFormProp
     const [errorMessage, setErrorMessage] = useState<string>("");
 
     useImperativeHandle(ref, () => ({
-      async submitPayment({ amountGbp, email, cartSummary }) {
+      async submitPayment() {
         if (!stripe || !elements) {
           const error = "Stripe is not loaded yet";
           setErrorMessage(error);
@@ -47,7 +43,6 @@ const StripePaymentForm = forwardRef<StripePaymentFormRef, StripePaymentFormProp
 
         try {
           // 1. Trigger form validation and collect the payment details.
-          //    Required by the deferred-intent flow before creating the PI.
           const { error: submitError } = await elements.submit();
           if (submitError) {
             const msg = submitError.message || "Please check your card details";
@@ -56,27 +51,11 @@ const StripePaymentForm = forwardRef<StripePaymentFormRef, StripePaymentFormProp
             return { success: false, error: msg };
           }
 
-          // 2. Create the PaymentIntent server-side for the exact cart total.
-          const res = await fetch("/api/create-payment-intent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              totalGbp: amountGbp,
-              customerEmail: email,
-              cartSummary,
-            }),
-          });
-          if (!res.ok) {
-            const e = await res.json().catch(() => ({}));
-            throw new Error(e.error || "Could not initialise payment");
-          }
-          const { clientSecret } = (await res.json()) as { clientSecret?: string };
-          if (!clientSecret) throw new Error("Missing client secret");
-
-          // 3. Confirm the payment.
+          // 2. Confirm the payment against the PaymentIntent that `elements`
+          //    was already initialised with (created by the checkout page's
+          //    call to /api/create-payment-intent before this form rendered).
           const { error } = await stripe.confirmPayment({
             elements,
-            clientSecret,
             confirmParams: {
               return_url: `${window.location.origin}/payment-success`,
             },
