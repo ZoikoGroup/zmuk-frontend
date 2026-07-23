@@ -1,80 +1,75 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { usStates } from "../utils/usStates";
-import { processOrderStripe } from "../utils/stripeWebPaymentApi";
+import { Elements } from "@stripe/react-stripe-js";
 import StripePaymentForm, { StripePaymentFormRef } from "../components/StripePaymentForm";
-import { useMemo } from "react";
 import type { StripeElementsOptions } from "@stripe/stripe-js";
 import { isLoggedIn as checkIsLoggedIn, getUser } from "../utils/auth";
-// ── Stub data for standalone compilation ──────────────────────────────────────
-
-// const processOrderStripe = async (data: unknown) => ({ status: true, data });
-
-// ─────────────────────────────────────────────────────────────────────────────
-
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Raw shape coming from localStorage (as stored by the plan-selection page) */
+/**
+ * Raw shape written to localStorage["cart"] by the plan-selection page.
+ * Every line is a Transatel SIM plan — there are no other product types.
+ *
+ * Example:
+ * {
+ *   "cartKey": "plan-10-30-psim",
+ *   "id": 10,
+ *   "type": "plan",
+ *   "name": "Zoiko Saver Plus",
+ *   "slug": "zoiko-saver-plus",
+ *   "image": "",
+ *   "category": "SIM Only Plans",
+ *   "price": 4.5,
+ *   "quantity": 1,
+ *   "metadata": {
+ *     "simType": "psim",
+ *     "duration": 30,
+ *     "dataAllowance": "3GB",
+ *     "transatelID": "TSL_UK_DATA_1GB",
+ *     "tier": null
+ *   }
+ * }
+ */
 interface RawCartItem {
+  cartKey?: string;
   id: string | number;
+  type?: string;                 // always "plan"
   name?: string;
+  slug?: string;
+  image?: string;
+  category?: string;             // e.g. "SIM Only Plans"
   price?: number | string;
-  speed?: string;
-  validity?: string | number;
-  description?: string;
-  address?: {
-    display: string;
-    city: string;
-    postcode: string;
-    [key: string]: any;
-  };
-
-  // ── Landline (manual) plan fields — written by the landline plans page ──
-  planType?: string;            // e.g. "landline_manual" | "ee_mobile_manual"
-  planName?: string;
-  planTitle?: string;
-  planDuration?: string;        // e.g. "36 Months"
-  finalPrice?: number;
-  salePrice?: number | string;
-
-  // ── EE mobile (manual) plan fields — written by the EE mobile plans page ──
-  dataAllowance?: string;       // e.g. "50GB", "Unlimited"
-  eeCategory?: string;          // e.g. "EE Mobile Bundles"
-  simType?: string;             // e.g. "eSIM" | "pSIM"
-  billingPeriod?: "monthly" | "one-off";
-
-  // ── Quantity — only accessories / phone_equipment honour this ──
-  qty?: number;
   quantity?: number;
-
-  [key: string]: any;
+  metadata?: {
+    simType?: string;            // "esim" | "psim"
+    duration?: number | string;  // billing period in days, e.g. 30
+    dataAllowance?: string;      // e.g. "3GB"
+    transatelID?: string;        // Transatel package/product code, e.g. "TSL_UK_DATA_1GB"
+    tier?: string | null;
+  };
+  [key: string]: unknown;
 }
 
 /** Normalised shape used throughout the component */
 interface CartItem {
+  cartKey: string;
   id: string | number;
   title: string;
   price: number;
-  description: string;
-  validity: string;
-  speed: string;
-  serviceAddress?: string;
-  planType?: string;
-  isLandline?: boolean;
-  isBusinessLandline?: boolean;
-  isEEMobile?: boolean;
-  isBroadband?: boolean;
-  isAccessories?: boolean;
-  isPhoneEquipment?: boolean;
-  dataAllowance?: string;
-  categoryLabel?: string;
-  simType?: string;
   quantity: number;
+  category: string;
+  image: string;
+  /** Display casing: "eSIM" | "pSIM" */
+  simType: string;
+  /** Lowercase key used for logic + API: "esim" | "psim" */
+  simTypeKey: "esim" | "psim";
+  duration: number | null;
+  dataAllowance: string;
+  transatelID: string;
+  tier: string | null;
   _raw: RawCartItem;
-  bt_plan_id?: string | null;
 }
 
 interface Address {
@@ -102,64 +97,47 @@ interface FormErrors {
 
 // ── Normalise a raw localStorage item into CartItem ───────────────────────────
 
-function normalizeCartItem(raw: RawCartItem): CartItem {
-  const isLandline = raw.planType === "landline_manual";
-  const isBusinessLandline = raw.planType === "business_landline";
-  const isEEMobile = raw.planType === "ee_mobile_manual";
-  const isBroadband = raw.planType === "broadband";
-  const isAccessories = raw.planType === "accessories";
-  const isPhoneEquipment = raw.planType === "phone_equipment";
+function normalizeCartItem(raw: RawCartItem, index: number): CartItem {
+  const meta = raw.metadata ?? {};
 
-  // Price can arrive as price / finalPrice / salePrice (string or number).
-  const rawPrice =
-    raw.price ?? raw.finalPrice ?? raw.salePrice ?? 0;
+  const rawPrice = raw.price ?? 0;
   const price =
     typeof rawPrice === "number" ? rawPrice : parseFloat(String(rawPrice)) || 0;
 
-  // Quantity only applies to accessories / phone_equipment; every other plan
-  // type is always a single line (quantity 1) regardless of any stored qty.
-  const rawQty = raw.qty ?? raw.quantity ?? 1;
-  const quantity =
-    isAccessories || isPhoneEquipment
-      ? Math.max(1, Math.floor(Number(rawQty) || 1))
-      : 1;
+  const quantity = Math.max(1, Math.floor(Number(raw.quantity ?? 1) || 1));
 
-  // Validity: landline / EE broadband store a label like "36 Months"; broadband
-  // stores a bare number of months that needs the suffix appended. One-off EE
-  // passes (roaming / voice) have no contract, so this stays blank.
-  const validity = (() => {
-    if (typeof raw.planDuration === "string" && raw.planDuration) {
-      return raw.planDuration;
-    }
-    if (raw.validity !== undefined && raw.validity !== "") {
-      return `${raw.validity} Months`;
-    }
-    return "";
-  })();
+  const simTypeKey: "esim" | "psim" =
+    String(meta.simType ?? "").toLowerCase() === "esim" ? "esim" : "psim";
+  const simType = simTypeKey === "esim" ? "eSIM" : "pSIM";
+
+  const durationRaw = meta.duration;
+  const duration =
+    durationRaw === undefined || durationRaw === null || durationRaw === ""
+      ? null
+      : Number(durationRaw) || null;
 
   return {
-    id:          raw.id,
-    title:       raw.name ?? raw.planName ?? raw.planTitle ?? "Unnamed Service",
+    cartKey: raw.cartKey ?? `${raw.id}-${index}`,
+    id: raw.id,
+    title: raw.name ?? "SIM Plan",
     price,
-    description: raw.description ?? "",
-    validity,
-    // Only broadband items carry a Mbps speed; landline / EE mobile do not.
-    speed:       !isLandline && !isEEMobile && raw.speed ? `${raw.speed} Mbps` : "",
-    serviceAddress: raw.address?.display ?? "",
-    planType:    raw.planType,
-    isLandline,
-    isBusinessLandline,
-    isEEMobile,
-    isBroadband,
-    isAccessories,
-    isPhoneEquipment,
-    dataAllowance: isEEMobile ? raw.dataAllowance : undefined,
-    categoryLabel: isEEMobile ? raw.eeCategory : undefined,
-    // SIM delivery type (eSIM / pSIM) — only EE mobile items carry this.
-    simType:     isEEMobile ? raw.simType : undefined,
     quantity,
-    _raw:        raw,
+    category: raw.category ?? "SIM Only Plans",
+    image: raw.image ?? "",
+    simType,
+    simTypeKey,
+    duration,
+    dataAllowance: meta.dataAllowance ?? "",
+    transatelID: meta.transatelID ?? "",
+    tier: meta.tier ?? null,
+    _raw: raw,
   };
+}
+
+/** "30" → "30 days"; passes through anything already labelled. */
+function formatDuration(duration: number | null): string {
+  if (!duration) return "";
+  return `${duration} day${duration === 1 ? "" : "s"}`;
 }
 
 // ── Small reusable components ─────────────────────────────────────────────────
@@ -190,70 +168,24 @@ const inputClass = (error?: string) =>
    focus:ring-2 focus:ring-red-300 focus:border-red-400 
    ${error ? "border-red-400 bg-red-50 dark:bg-red-900" : "border-gray-200 bg-white dark:bg-gray-800 "}`;
 
-const selectClass = (error?: string) =>
-  `w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors
-   focus:ring-2 focus:ring-red-300 focus:border-red-400
-   ${error ? "border-red-400 bg-red-50 dark:bg-red-900" : "border-gray-200 bg-white  dark:bg-gray-800"}`;
-
 // ── Address Form ──────────────────────────────────────────────────────────────
 
 const billingFieldMeta: Record<string, { label: string; placeholder: string; disabled?: boolean }> = {
   firstName:   { label: "First Name",       placeholder: "Enter your first name" },
   lastName:    { label: "Last Name",        placeholder: "Enter your last name" },
   companyName: { label: "Company Name",     placeholder: "Company name (optional)" },
-  region:      { label: "Country / Region", placeholder: "United States (US)"},
-  state:       { label: "State",            placeholder: "Select state" },
-  city:        { label: "City",             placeholder: "Enter your city" },
+  region:      { label: "Country / Region", placeholder: "United Kingdom (UK)" },
+  state:       { label: "County",           placeholder: "Enter your county" },
+  city:        { label: "City / Town",      placeholder: "Enter your city or town" },
   street:      { label: "Street Address",   placeholder: "Enter your street address" },
-  houseNumber: { label: "Apt / Suite",      placeholder: "Apartment or suite" },
-  zip:         { label: "ZIP Code( Max 12 characters)",         placeholder: "Enter ZIP code" },
+  houseNumber: { label: "Flat / House No.", placeholder: "Flat or house number" },
+  zip:         { label: "Postcode (max 12 characters)", placeholder: "Enter postcode" },
   phone:       { label: "Phone Number",     placeholder: "Enter phone number" },
   email:       { label: "Email Address",    placeholder: "Enter email address" },
 };
 
-const requiredBillingFields = ["firstName", "lastName", "state", "city", "houseNumber", "zip", "email", "phone"];
+const requiredBillingFields = ["firstName", "lastName", "city", "houseNumber", "zip", "email", "phone"];
 
-// const AddressForm = ({
-//   address,
-//   setAddress,
-//   prefix,
-//   errors,
-//   loading,
-//   includeShipping = false,
-// }: {
-//   address: Address;
-//   setAddress: (a: Address) => void;
-//   prefix: string;
-//   errors: FormErrors;
-//   loading: boolean;
-//   includeShipping?: boolean;
-// }) => (
-//   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-700 dark:text-gray-300">
-//     {(Object.keys(address) as Array<keyof Address>).map((key) => {
-//       const meta = billingFieldMeta[key] || { label: key, placeholder: key };
-//       const errKey = `${prefix}${key.charAt(0).toUpperCase() + key.slice(1)}`;
-//       const isRequired =
-//         requiredBillingFields.includes(key) ||
-//         (includeShipping &&
-//           ["firstName", "lastName", "state", "city", "houseNumber", "zip", "email"].includes(key));
-
-//       return (
-//         <InputField key={key} label={meta.label} required={isRequired} error={errors[errKey]}>
-          
-//             <input
-//               type="text"
-//               className={inputClass(errors[errKey])}
-//               placeholder={meta.placeholder}
-//               value={address[key]}
-//               disabled={meta.disabled || loading}
-//               onChange={(e) => setAddress({ ...address, [key]: e.target.value })}
-//             />
-          
-//         </InputField>
-//       );
-//     })}
-//   </div>
-// );
 const AddressForm = ({
   address,
   setAddress,
@@ -278,23 +210,11 @@ const AddressForm = ({
       const isRequired =
         requiredBillingFields.includes(key) ||
         (includeShipping &&
-          ["firstName", "lastName", "state", "city", "houseNumber", "zip", "email"].includes(key));
+          ["firstName", "lastName", "city", "houseNumber", "zip", "email"].includes(key));
 
       const isPhone = key === "phone";
       const isZip = key === "zip";
 
-      // Clean/cap the value at input time, then update state
-      // const handleChange = (raw: string) => {
-      //   let value = raw;
-      //   if (isPhone) {
-          
-      //     value = raw.replace(/\D/g, "").slice(0, 15);
-      //   } else if (isZip) {
-        
-      //     value = raw.slice(0, 12);
-      //   }
-      //   setAddress({ ...address, [key]: value });
-      // };
       const handleChange = (raw: string) => {
         let value = raw;
         let filterMsg = "";
@@ -304,23 +224,18 @@ const AddressForm = ({
           value = digitsOnly.slice(0, 15);
 
           if (digitsOnly !== raw) {
-            // something non-digit was typed/pasted and removed
             filterMsg = "Only numbers are allowed";
           } else if (digitsOnly.length > 15) {
-            // they hit the 15-digit ceiling
             filterMsg = "Phone number cannot exceed 15 digits";
           }
         } else if (isZip) {
           value = raw.slice(0, 12);
-
           if (raw.length > 12) {
-            filterMsg = "ZIP code cannot exceed 12 characters";
+            filterMsg = "Postcode cannot exceed 12 characters";
           }
         }
 
         setAddress({ ...address, [key]: value });
-
-        // Show the "why it was blocked" message, or clear it if input was fine
         onValidateField?.(errKey, value, filterMsg);
       };
 
@@ -329,7 +244,6 @@ const AddressForm = ({
           <input
             type="text"
             inputMode={isPhone ? "numeric" : undefined}
-            // maxLength={isZip ? 12 : isPhone ? 15 : undefined}
             className={inputClass(errors[errKey])}
             placeholder={meta.placeholder}
             value={address[key]}
@@ -373,8 +287,6 @@ const Modal = ({
   );
 };
 
-
-
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function CheckoutPage() {
@@ -385,7 +297,6 @@ export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState("");
   const [showThankYou, setShowThankYou] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [showShipping, setShowShipping] = useState(false);
   const [coupon, setCoupon] = useState("");
   const [loading, setLoading] = useState(false);
   const [discountData, setDiscountData] = useState<DiscountData | null>(null);
@@ -395,20 +306,15 @@ export default function CheckoutPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [showTermsPopup, setShowTermsPopup] = useState(false);
-  // The Stripe fields live in a cross-origin iframe that cannot inherit the
-  // page's dark styling — it only obeys the `appearance` object handed to it at
-  // creation. So we detect dark mode by MEASURING the actual payment card that
-  // is on screen (see paymentCardRef below) and matching Stripe to its real
-  // background colour. Reading the live element works no matter how dark mode is
-  // wired — Tailwind `dark:` class, `prefers-color-scheme` media query, a
-  // `data-theme` attribute, or hand-written CSS.
+
+  // Stripe's cross-origin iframe can't inherit page dark styling; it only obeys
+  // the `appearance` object handed to it. So we detect dark mode by MEASURING
+  // the actual payment card background and match Stripe to it.
   const paymentCardRef = useRef<HTMLDivElement>(null);
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
     const compute = () => {
-      // Walk up from the payment card until we hit an element with an actually
-      // painted (non-transparent) background, falling back to <body>.
       let el: HTMLElement | null = paymentCardRef.current;
       let bg = "";
       while (el) {
@@ -421,8 +327,6 @@ export default function CheckoutPage() {
       }
       if (!bg) bg = getComputedStyle(document.body).backgroundColor;
 
-      // bg is "rgb(r, g, b)" / "rgba(...)". Sum the channels; below the 384
-      // midpoint means a dark fill, so we render Stripe in dark mode.
       const rgb = bg.match(/\d+/g);
       setIsDark(
         rgb ? Number(rgb[0]) + Number(rgb[1]) + Number(rgb[2]) < 384 : false,
@@ -431,8 +335,6 @@ export default function CheckoutPage() {
 
     compute();
 
-    // Re-measure on any theme switch: OS-level (media strategy) or a class /
-    // attribute toggle on <html> (next-themes, manual, data-theme).
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     mq.addEventListener("change", compute);
     const observer = new MutationObserver(compute);
@@ -448,81 +350,50 @@ export default function CheckoutPage() {
   }, []);
 
   const stripeOptions: StripeElementsOptions = useMemo(() => {
-  return {
-    clientSecret,
-
-    appearance: {
-      theme: isDark ? "night" : "stripe",
-
-      variables: {
-        colorPrimary: "#ef4444",
-
-        colorBackground: isDark
-          ? "#1f2937"
-          : "#ffffff",
-
-        colorText: isDark
-          ? "#f9fafb"
-          : "#111827",
-
-        colorDanger: "#ef4444",
-
-        colorTextPlaceholder: isDark
-          ? "#9ca3af"
-          : "#6b7280",
-
-        borderRadius: "12px",
-
-        fontFamily: "Inter, sans-serif",
-      },
-
-      rules: {
-        ".Input": {
-          backgroundColor: isDark
-            ? "#111827"
-            : "#ffffff",
-
-          border: isDark
-            ? "1px solid #374151"
-            : "1px solid #d1d5db",
-
-          boxShadow: "none",
+    return {
+      clientSecret,
+      appearance: {
+        theme: isDark ? "night" : "stripe",
+        variables: {
+          colorPrimary: "#ef4444",
+          colorBackground: isDark ? "#1f2937" : "#ffffff",
+          colorText: isDark ? "#f9fafb" : "#111827",
+          colorDanger: "#ef4444",
+          colorTextPlaceholder: isDark ? "#9ca3af" : "#6b7280",
+          borderRadius: "12px",
+          fontFamily: "Inter, sans-serif",
         },
-
-        ".Input:focus": {
-          border: "1px solid #ef4444",
-          boxShadow: "0 0 0 1px #ef4444",
-        },
-
-        ".Tab": {
-          backgroundColor: isDark
-            ? "#111827"
-            : "#f9fafb",
-
-          border: isDark
-            ? "1px solid #374151"
-            : "1px solid #d1d5db",
-        },
-
-        ".Tab--selected": {
-          border: "1px solid #ef4444",
-          boxShadow: "0 0 0 1px #ef4444",
-        },
-
-        ".Label": {
-          color: isDark
-            ? "#f3f4f6"
-            : "#111827",
+        rules: {
+          ".Input": {
+            backgroundColor: isDark ? "#111827" : "#ffffff",
+            border: isDark ? "1px solid #374151" : "1px solid #d1d5db",
+            boxShadow: "none",
+          },
+          ".Input:focus": {
+            border: "1px solid #ef4444",
+            boxShadow: "0 0 0 1px #ef4444",
+          },
+          ".Tab": {
+            backgroundColor: isDark ? "#111827" : "#f9fafb",
+            border: isDark ? "1px solid #374151" : "1px solid #d1d5db",
+          },
+          ".Tab--selected": {
+            border: "1px solid #ef4444",
+            boxShadow: "0 0 0 1px #ef4444",
+          },
+          ".Label": {
+            color: isDark ? "#f3f4f6" : "#111827",
+          },
         },
       },
-    },
-  };
-}, [clientSecret, isDark]);
+    };
+  }, [clientSecret, isDark]);
+
   const emptyAddress: Address = {
     firstName: "",
     lastName: "",
     companyName: "",
-    region: "United States (US)",
+    region: "United Kingdom (UK)",
     state: "",
     city: "",
     street: "",
@@ -550,8 +421,8 @@ export default function CheckoutPage() {
       if (checkIsLoggedIn()) {
         setIsLoggedIn(true);
 
-        // Prefill from the account so the order is reliably saved against the
-        // logged-in user — "My Orders" matches on this email server-side.
+        // Prefill from the account so the order is saved against the logged-in
+        // user — "My Orders" matches on this email server-side.
         const user = getUser();
         if (user) {
           setBillingAddress((prev) => ({
@@ -562,8 +433,6 @@ export default function CheckoutPage() {
           }));
         }
       } else {
-        // Not logged in — surface the requirement immediately rather than
-        // waiting until the customer tries to pay.
         setLoginPromptReason("order");
         setShowLoginPopup(true);
       }
@@ -575,51 +444,42 @@ export default function CheckoutPage() {
   // ── Derived helpers ───────────────────────────────────────────────────────
 
   /**
-   * Physical SIM items require shipping.
-   * Triggered by:  simType === "pSIM"  OR  type === "device"
+   * Physical (pSIM) items are shipped, so they require a shipping address.
+   * eSIMs are delivered by email and need none.
    */
- 
-  /**
-   * Activation fee applies to prepaid-plan eSIM items only.
-   * (pSIM activation is handled differently / already priced in.)
-   */
- 
-
- 
+  const hasPhysicalSim = cart.some((item) => item.simTypeKey === "psim");
 
   // ── Cart mutations ────────────────────────────────────────────────────────
+
+  const persistCart = (next: CartItem[]) => {
+    try {
+      localStorage.setItem("cart", JSON.stringify(next.map((i) => i._raw)));
+      // Notify the header CartIcon (same-tab "storage" doesn't fire).
+      window.dispatchEvent(new Event("cart-updated"));
+    } catch {
+      /* ignore storage errors */
+    }
+  };
 
   const handleRemove = (index: number) => {
     const newCart = [...cart];
     newCart.splice(index, 1);
     setCart(newCart);
-    localStorage.setItem("cart", JSON.stringify(newCart.map((i) => i._raw)));
-    // Notify the header CartIcon (same-tab "storage" doesn't fire).
-    window.dispatchEvent(new Event("cart-updated"));
+    persistCart(newCart);
   };
 
-  // Adjust quantity for a single line. Only accessories / phone_equipment are
-  // quantity-adjustable; other plan types ignore this and stay at 1. Persists
-  // the raw cart to localStorage and fires "cart-updated" so the header badge
-  // (and any other listener) refreshes.
   const handleQuantityChange = (index: number, nextQty: number) => {
     const qty = Math.max(1, Math.floor(nextQty) || 1);
     setCart((prev) => {
       const next = prev.map((item, i) => {
         if (i !== index) return item;
-        if (!item.isAccessories && !item.isPhoneEquipment) return item;
         return {
           ...item,
           quantity: qty,
-          _raw: { ...item._raw, qty, quantity: qty },
+          _raw: { ...item._raw, quantity: qty },
         };
       });
-      try {
-        localStorage.setItem("cart", JSON.stringify(next.map((i) => i._raw)));
-        window.dispatchEvent(new Event("cart-updated"));
-      } catch {
-        /* ignore storage errors */
-      }
+      persistCart(next);
       return next;
     });
   };
@@ -661,7 +521,7 @@ export default function CheckoutPage() {
         const clean = Number.isInteger(num) ? num.toString() : num.toFixed(2);
         setCouponMessage(
           `Coupon applied! Discount: ${
-            data.data.type === "percentage" ? clean + "%" : "$" + clean + " flat"
+            data.data.type === "percentage" ? clean + "%" : "£" + clean + " flat"
           }`
         );
       } else {
@@ -693,8 +553,6 @@ export default function CheckoutPage() {
       : Number(discountData.discount)
     : 0;
 
-
-
   const total = Math.max(subtotal - (discountAmount || 0), 0);
 
   // ── Create Stripe payment intent ──────────────────────────────────────────
@@ -719,16 +577,14 @@ export default function CheckoutPage() {
         })
         .catch(() => {});
     }
-  }, [total,
-  subtotal,
-  discountAmount,
-  cart,]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total, subtotal, discountAmount, cart]);
 
-    // ── field validators ──────────────────────────────
+  // ── field validators ──────────────────────────────
   const validateZip = (zip: string) => {
     const v = zip.trim();
     if (!v) return "Required";
-    if (v.length > 12) return "ZIP code cannot exceed 12 characters";
+    if (v.length > 12) return "Postcode cannot exceed 12 characters";
     return "";
   };
 
@@ -745,19 +601,19 @@ export default function CheckoutPage() {
   const validateFields = (): boolean => {
     const newErrors: FormErrors = {};
     const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRx = /^[0-9]{7,15}$/;
+
     newErrors.billingFirstName = billingAddress.firstName ? "" : "Required";
     newErrors.billingLastName = billingAddress.lastName ? "" : "Required";
-    newErrors.billingState = billingAddress.state ? "" : "Required";
     newErrors.billingCity = billingAddress.city ? "" : "Required";
     newErrors.billingHouseNumber = billingAddress.houseNumber ? "" : "Required";
     newErrors.billingZip = validateZip(billingAddress.zip);
     newErrors.billingEmail = emailRx.test(billingAddress.email) ? "" : "Invalid email";
     newErrors.billingPhone = validatePhone(billingAddress.phone);
-    if (showShipping) {
+
+    // Shipping is required only when the cart contains a physical SIM.
+    if (hasPhysicalSim) {
       newErrors.shippingFirstName = shippingAddress.firstName ? "" : "Required";
       newErrors.shippingLastName = shippingAddress.lastName ? "" : "Required";
-      newErrors.shippingState = shippingAddress.state ? "" : "Required";
       newErrors.shippingCity = shippingAddress.city ? "" : "Required";
       newErrors.shippingHouseNumber = shippingAddress.houseNumber ? "" : "Required";
       newErrors.shippingZip = validateZip(shippingAddress.zip);
@@ -770,7 +626,6 @@ export default function CheckoutPage() {
 
   // Validate a single field live (used on blur from AddressForm)
   const validateOneField = (errKey: string, value: string, filterMsg?: string) => {
-     // A filter message means the input was actively blocked — show that reason first.
     if (filterMsg) {
       setErrors((prev) => ({ ...prev, [errKey]: filterMsg }));
       return;
@@ -784,8 +639,8 @@ export default function CheckoutPage() {
       msg = validatePhone(value);
     } else if (errKey.endsWith("Email")) {
       msg = emailRx.test(value) ? "" : "Invalid email";
-    } else if (errKey.endsWith("CompanyName")) {
-      msg = ""; // optional field — never errors
+    } else if (errKey.endsWith("CompanyName") || errKey.endsWith("State") || errKey.endsWith("Street")) {
+      msg = ""; // optional fields — never error
     } else {
       msg = value.trim() ? "" : "Required";
     }
@@ -793,148 +648,112 @@ export default function CheckoutPage() {
     setErrors((prev) => ({ ...prev, [errKey]: msg }));
   };
 
-  const buildProducts = () =>
+  // Build the order line items. transatelID + simType drive server-side SIM
+  // reservation (matched against the Transatel SIM inventory by type_of_sim).
+  const buildItems = () =>
     cart.map((item) => {
-      // We ensure the price is a valid number first
       const unitPrice = Number(item.price ?? 0);
-      // Quantity is only > 1 for accessories / phone_equipment (set in
-      // normalizeCartItem); all other plan types stay at 1.
-      const quantity = item.quantity;
-
       return {
         id: item.id,
+        cartKey: item.cartKey,
         name: item.title,
+        category: item.category,
         pricePerUnit: unitPrice,
-        quantity,
-        totalPrice: unitPrice * quantity,
-        description: item.description,
-        validity: item.validity,
-        speed: item.speed,
-        simType: item.simType,
-        address: item.serviceAddress,
+        quantity: item.quantity,
+        totalPrice: unitPrice * item.quantity,
+        simType: item.simTypeKey,       // "esim" | "psim"
+        duration: item.duration,
+        dataAllowance: item.dataAllowance,
+        transatelID: item.transatelID,  // Transatel package/product code
+        tier: item.tier,
       };
-  });
+    });
 
   // ── Place Order – Stripe ──────────────────────────────────────────────────
 
   const handlePlaceOrderStripe = async () => {
-  if (!checkIsLoggedIn()) {
-    setLoginPromptReason("order");
-    setShowLoginPopup(true);
-    return;
-  }
-  if (!agreeTerms) { setShowTermsPopup(true); return; }
-  if (!validateFields()) return;
+    if (!checkIsLoggedIn()) {
+      setLoginPromptReason("order");
+      setShowLoginPopup(true);
+      return;
+    }
+    if (!agreeTerms) { setShowTermsPopup(true); return; }
+    if (!validateFields()) return;
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    // 1️⃣ Stripe payment
-    if (stripeFormRef.current) {
-      const result = await stripeFormRef.current.submitPayment({
-        amountGbp: total,
-        email: billingAddress.email,
-        cartSummary: {
-          itemCount: cart.length,
-          variationIds: cart.map(item => Number(item.id)),
+      // 1️⃣ Stripe payment
+      if (stripeFormRef.current) {
+        const result = await stripeFormRef.current.submitPayment();
+        console.log("✅ Stripe result:", result);
+        if (!result.success) {
+          setOrderError(result.error || "Payment failed.");
+          setShowOrderErrorPopup(true);
+          return;
+        }
+      }
+
+      // 2️⃣ Build the SIM-plan order and save it to Django. The backend reserves
+      //    a matching SIM from the Transatel inventory per line (by simType +
+      //    transatelID) and sends the activation / dispatch email.
+      const user = getUser();
+      const orderPayload = {
+        user_id: user?.id ?? null,
+        email: billingAddress.email || user?.email || "",
+        country_code: "UK",
+        billingAddress,
+        shippingAddress: hasPhysicalSim ? shippingAddress : billingAddress,
+        coupon: discountData ? { ...discountData } : null,
+        items: buildItems(),
+        totals: { subtotal, discount: discountAmount, total },
+        agreedToTerms: agreeTerms,
+        paymentMethod: "stripe",
+        createdAt: new Date().toISOString(),
+      };
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user?.token) headers.Authorization = `Bearer ${user.token}`;
+
+      // Transatel SIM order: the backend reserves a SIM per line (matched by
+      // simType), assigns it to this order, and activates it via the Transatel
+      // API using the plan's transatelID as the package code.
+      const orderRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/sim-orders/`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(orderPayload),
         },
-      });
-      console.log("✅ Stripe result:", result);  // ← ADD
-      if (!result.success) {
-        setOrderError(result.error || "Payment failed.");
+      );
+      const orderResData = await orderRes.json().catch(() => ({}));
+      console.log(
+        "✅ Django response ok:", orderRes.ok,
+        "status:", orderRes.status, "data:", orderResData,
+      );
+
+      if (!orderRes.ok || !orderResData?.success) {
+        setOrderError(orderResData?.message || "Order could not be saved.");
         setShowOrderErrorPopup(true);
         return;
       }
-    }
 
-    // 2️⃣ BT Wholesale order
-    //    processOrderStripe() reads the raw cart from localStorage and forwards
-    //    it (with product.characteristics / product.offering / zoikoPlan) to
-    //    /api/BritishTelecom/process-order, which runs the full BT flow:
-    //    RoBT lookup → appointment slot search → book → place product order.
-    const products = buildProducts();
-    const orderData = {
-      billingAddress,
-      shippingAddress: showShipping ? shippingAddress : billingAddress,
-      coupon: discountData ? { ...discountData } : null,
-      cart: products, // billing-summary view; the BT route uses the raw cart from localStorage
-      totals: { subtotal, discount: discountAmount, total },
-      agreedToTerms: agreeTerms,
-      paymentMethod: "stripe",
-      createdAt: new Date().toISOString(),
-    };
-
-    const response = await processOrderStripe(orderData);
-    console.log("✅ processOrderStripe response:", response);
-
-    if (!response?.status) {
-      setOrderError(response?.message || "Order processing failed.");
-      setShowOrderErrorPopup(true);
-      return;
-    }
-
-    // processOrderStripe splits a mixed cart into one payload per order
-    // (broadband / ee_mobile / landline). Save each to Django.
-    const orders =
-      (response as Record<string, unknown>).orders as Record<string, unknown>[] | undefined;
-    const payloads =
-      orders && orders.length
-        ? orders
-        : [((response as Record<string, unknown>).data ?? response)];
-
-    // 3️⃣ Save each order to Django
-    let savedCount = 0;
-    let lastError = "";
-    for (const payload of payloads) {
+      // Order saved — clear the cart so it isn't re-submitted.
       try {
-        const orderRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/bqorders/`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          },
-        );
-        const orderResData = await orderRes.json().catch(() => ({}));
-        console.log(
-          "✅ Django response ok:", orderRes.ok,
-          "status:", orderRes.status, "data:", orderResData,
-        );
-        if (orderRes.ok && orderResData?.success) {
-          savedCount += 1;
-        } else {
-          lastError = orderResData?.message || "Order could not be saved.";
-        }
-      } catch (e) {
-        lastError = e instanceof Error ? e.message : "Order could not be saved.";
+        localStorage.removeItem("cart");
+        window.dispatchEvent(new Event("cart-updated"));
+      } catch {
+        /* ignore storage errors */
       }
-    }
-
-    if (savedCount === 0) {
-      setOrderError(lastError || "Order could not be saved.");
+      setShowThankYou(true);
+    } catch (err: unknown) {
+      console.error("❌ caught error:", err);
+      setOrderError(err instanceof Error ? err.message : "Something went wrong.");
       setShowOrderErrorPopup(true);
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    // Order(s) saved — clear the cart so it isn't re-submitted.
-    try {
-      localStorage.removeItem("cart");
-      window.dispatchEvent(new Event("cart-updated"));
-    } catch {
-      /* ignore storage errors */
-    }
-    setShowThankYou(true);
-
-    console.log(`✅ showThankYou set to true (${savedCount}/${payloads.length} orders saved)`);
-
-  } catch (err: any) {
-    console.error("❌ caught error:", err);  // ← ADD
-    setOrderError(err?.message || "Something went wrong.");
-    setShowOrderErrorPopup(true);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const formatDiscount = (value: string | number) => {
     const n = parseFloat(String(value));
@@ -956,8 +775,7 @@ export default function CheckoutPage() {
           </svg>
         </div>
         <h2 className="text-2xl font-bold dark:text-white text-gray-900 mb-2">Your cart is empty</h2>
-        <p className="text-gray-500 dark:text-gray-400 mb-8">Looks like you haven't added anything yet.</p>
-        
+        <p className="text-gray-500 dark:text-gray-400 mb-8">Looks like you haven&apos;t added a plan yet.</p>
       </div>
     );
   }
@@ -965,31 +783,6 @@ export default function CheckoutPage() {
   // ── Main Checkout ─────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen dark:bg-gray-900 bg-gray-50">
-      {/* Page header */}
-      {/* <div className=" border-b border-gray-100 py-6 px-4">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Checkout</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Connecting Every Possibility with Zoiko Mobile!</p>
-          </div>
-          <button
-            onClick={handleClearCart}
-            disabled={loading}
-            className="self-start sm:self-auto flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-500 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-            Clear Cart
-          </button>
-        </div>
-      </div> */}
-
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
 
@@ -1004,112 +797,52 @@ export default function CheckoutPage() {
               </div>
               <div className="divide-y divide-gray-50">
                 {cart.map((item, idx) => (
-                  <div key={idx} className="px-6 py-4">
+                  <div key={item.cartKey} className="px-6 py-4">
                     <div className="flex items-start gap-4">
                       {/* 📦 Plan Information */}
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-900 dark:text-white text-lg leading-tight mb-1">
                           {item.title}
                         </p>
-                        
+
                         <div className="flex flex-wrap items-center gap-3 mb-2">
-                          {/* 📞 Landline Type Badge */}
-                          {item.isLandline && (
-                            <span className="bg-purple-50 text-purple-700 text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                              </svg>
-                              Business Landline
+                          {/* 🏷️ Category */}
+                          {item.category && (
+                            <span className="bg-[#c61b7f]/10 text-[#c61b7f] text-xs font-bold px-2.5 py-1 rounded-md">
+                              {item.category}
                             </span>
                           )}
-                          {/* 📞 Business Landline (configured digital landline) */}
-                          {item.isBusinessLandline && (
-                            <span className="bg-[#E91E8C]/10 text-[#E91E8C] text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.95.68l1.5 4.5a1 1 0 01-.5 1.21l-2.26 1.13a11 11 0 005.52 5.52l1.13-2.26a1 1 0 011.21-.5l4.5 1.5a1 1 0 01.68.95V19a2 2 0 01-2 2h-1C9.72 21 3 14.28 3 6V5z" />
-                              </svg>
-                              Business Landline
+                          {/* 📶 SIM Type (eSIM / pSIM) */}
+                          <span className="bg-teal-50 text-teal-700 text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 3h6l4 4v12a2 2 0 01-2 2H8a2 2 0 01-2-2V5a2 2 0 012-2z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 13h6m-6 4h6m-6-8h2" />
+                            </svg>
+                            {item.simType}
+                          </span>
+                          {/* 📊 Data allowance */}
+                          {item.dataAllowance && (
+                            <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-md">
+                              {item.dataAllowance}
                             </span>
                           )}
-                          {/* 📱 EE Mobile Type Badge (+ data allowance) */}
-                          {item.isEEMobile && (
-                            <span className="bg-pink-50 text-pink-700 text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-1m-6-8h8m0 0V4m0 3v3" />
-                              </svg>
-                              EE Mobile{item.dataAllowance ? ` · ${item.dataAllowance}` : ""}
-                            </span>
-                          )}
-                          {/* 🌐 Broadband Type Badge */}
-                          {item.isBroadband && (
-                            <span className="bg-[#c61b7f]/10 text-[#c61b7f] text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12.55a11 11 0 0114 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01" />
-                              </svg>
-                              Broadband
-                            </span>
-                          )}
-                          {/* 🎧 Accessories Type Badge */}
-                          {item.isAccessories && (
-                            <span className="bg-[#7B2983]/10 text-[#7B2983] text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                              </svg>
-                              Accessories
-                            </span>
-                          )}
-                          {/* 📞 Phone & Equipment Type Badge */}
-                          {item.isPhoneEquipment && (
-                            <span className="bg-[#C12172]/10 text-[#C12172] text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.95.68l1.5 4.5a1 1 0 01-.5 1.21l-2.26 1.13a11 11 0 005.52 5.52l1.13-2.26a1 1 0 011.21-.5l4.5 1.5a1 1 0 01.68.95V19a2 2 0 01-2 2h-1C9.72 21 3 14.28 3 6V5z" />
-                              </svg>
-                              Phone &amp; Equipment
-                            </span>
-                          )}
-                          {/* 📶 SIM Type Badge (eSIM / pSIM) */}
-                          {item.simType && (
-                            <span className="bg-teal-50 text-teal-700 text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 3h6l4 4v12a2 2 0 01-2 2H8a2 2 0 01-2-2V5a2 2 0 012-2z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 13h6m-6 4h6m-6-8h2" />
-                              </svg>
-                              {item.simType}
-                            </span>
-                          )}
-                          {/* ⚡ Speed Badge */}
-                          {item.speed && (
-                            <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                              </svg>
-                              {item.speed}
-                            </span>
-                          )}
-                          {/* 🗓️ Validity Label */}
-                          {item.validity && (
+                          {/* 🗓️ Duration */}
+                          {item.duration && (
                             <span className="text-xs text-gray-500 font-medium">
-                              Contract: {item.validity}
-                            </span>
-                          )}
-                          {/* 🏷️ EE Category Label */}
-                          {item.categoryLabel && (
-                            <span className="text-xs text-gray-500 font-medium">
-                              {item.categoryLabel}
+                              {formatDuration(item.duration)}
                             </span>
                           )}
                         </div>
 
-                        {/* 📍 Service Address */}
-                        {item.serviceAddress && (
-                          <p className="text-xs text-gray-400 flex items-start gap-1">
-                            <svg className="w-3 h-3 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            {item.serviceAddress}
-                          </p>
-                        )}
+                        {/* Delivery method note */}
+                        <p className="text-xs text-gray-400 flex items-start gap-1">
+                          <svg className="w-3 h-3 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          {item.simTypeKey === "esim"
+                            ? "eSIM — activation instructions sent by email after purchase."
+                            : "Physical SIM — shipped to your address."}
+                        </p>
                       </div>
 
                       {/* 💰 Price Display */}
@@ -1122,37 +855,35 @@ export default function CheckoutPage() {
                             £{item.price.toFixed(2)} × {item.quantity}
                           </p>
                         )}
-                        {/* 🔢 Quantity stepper — accessories / phone & equipment only */}
-                        {(item.isAccessories || item.isPhoneEquipment) && (
-                          <div className="mt-2 inline-flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => handleQuantityChange(idx, item.quantity - 1)}
-                              disabled={loading || item.quantity <= 1}
-                              aria-label="Decrease quantity"
-                              className="px-2.5 py-1 text-base leading-none text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                            >
-                              −
-                            </button>
-                            <input
-                              type="number"
-                              min={1}
-                              value={item.quantity}
-                              disabled={loading}
-                              onChange={(e) => handleQuantityChange(idx, parseInt(e.target.value, 10))}
-                              className="w-10 py-1 text-center text-sm font-semibold bg-transparent text-gray-900 dark:text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleQuantityChange(idx, item.quantity + 1)}
-                              disabled={loading}
-                              aria-label="Increase quantity"
-                              className="px-2.5 py-1 text-base leading-none text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors"
-                            >
-                              +
-                            </button>
-                          </div>
-                        )}
+                        {/* 🔢 Quantity stepper */}
+                        <div className="mt-2 inline-flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(idx, item.quantity - 1)}
+                            disabled={loading || item.quantity <= 1}
+                            aria-label="Decrease quantity"
+                            className="px-2.5 py-1 text-base leading-none text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                            disabled={loading}
+                            onChange={(e) => handleQuantityChange(idx, parseInt(e.target.value, 10))}
+                            className="w-10 py-1 text-center text-sm font-semibold bg-transparent text-gray-900 dark:text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(idx, item.quantity + 1)}
+                            disabled={loading}
+                            aria-label="Increase quantity"
+                            className="px-2.5 py-1 text-base leading-none text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                          >
+                            +
+                          </button>
+                        </div>
                         <div>
                           <button
                             onClick={() => handleRemove(idx)}
@@ -1211,7 +942,7 @@ export default function CheckoutPage() {
 
             {/* Billing Address */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="font-bold text-gray-900 dark:text-white mb-5">Service / Billing Details</h2>
+              <h2 className="font-bold text-gray-900 dark:text-white mb-5">Billing Details</h2>
               <AddressForm
                 address={billingAddress}
                 setAddress={setBillingAddress}
@@ -1221,20 +952,15 @@ export default function CheckoutPage() {
                 onValidateField={validateOneField}
               />
 
-              <label className="flex items-center gap-2.5 mt-5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showShipping}
-                  onChange={(e) => setShowShipping(e.target.checked)}
-                  disabled={loading}
-                  className="w-4 h-4 accent-red-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Ship to a different address?</span>
-              </label>
-
-              {showShipping && (
+              {/* Shipping is required for physical SIMs, hidden for eSIM-only carts. */}
+              {hasPhysicalSim ? (
                 <div className="mt-5 pt-5 border-t border-gray-100">
-                  <h3 className="font-semibold text-gray-800 mb-4">Shipping Address</h3>
+                  <div className="flex items-center gap-2 mb-4">
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-200">Shipping Address</h3>
+                    <span className="bg-teal-50 text-teal-700 text-xs font-bold px-2 py-0.5 rounded">
+                      Required for physical SIM
+                    </span>
+                  </div>
                   <AddressForm
                     address={shippingAddress}
                     setAddress={setShippingAddress}
@@ -1245,6 +971,13 @@ export default function CheckoutPage() {
                     onValidateField={validateOneField}
                   />
                 </div>
+              ) : (
+                <p className="mt-5 pt-5 border-t border-gray-100 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                  <svg className="w-4 h-4 shrink-0 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Your eSIM will be delivered by email — no shipping address needed.
+                </p>
               )}
             </div>
           </div>
@@ -1257,8 +990,8 @@ export default function CheckoutPage() {
               <h2 className="font-bold text-gray-900 dark:text-white mb-4">Order Summary</h2>
 
               <div className="space-y-3">
-                {cart.map((item, idx) => (
-                  <div key={idx} className="flex items-start justify-between gap-2 text-sm">
+                {cart.map((item) => (
+                  <div key={item.cartKey} className="flex items-start justify-between gap-2 text-sm">
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900 dark:text-white truncate">{item.title}</p>
                       {item.quantity > 1 && (
@@ -1266,25 +999,18 @@ export default function CheckoutPage() {
                           £{item.price.toFixed(2)} × {item.quantity}
                         </span>
                       )}
-                      {item.simType && (
-                        <span className="text-xs text-teal-600 dark:text-teal-400 font-medium">
-                          {item.simType}
-                        </span>
-                      )}
-                      {item.speed && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Speed: {item.speed}
-                        </span>
-                      )}
+                      <span className="block text-xs text-teal-600 dark:text-teal-400 font-medium">
+                        {item.simType}
+                        {item.dataAllowance ? ` · ${item.dataAllowance}` : ""}
+                        {item.duration ? ` · ${formatDuration(item.duration)}` : ""}
+                      </span>
                     </div>
                     <span className="font-semibold text-gray-900 dark:text-white shrink-0">
-                       £{(item.price * item.quantity).toFixed(2)}
+                      £{(item.price * item.quantity).toFixed(2)}
                     </span>
                   </div>
                 ))}
               </div>
-
-            
 
               {discountData && (
                 <div className="flex justify-between text-sm mt-2">
@@ -1292,7 +1018,7 @@ export default function CheckoutPage() {
                     Discount (
                     {discountData.type === "percentage"
                       ? formatDiscount(discountData.discount) + "%"
-                      : "$" + formatDiscount(discountData.discount)}
+                      : "£" + formatDiscount(discountData.discount)}
                     )
                   </span>
                   <span className="font-medium text-green-600">
@@ -1483,18 +1209,17 @@ export default function CheckoutPage() {
           <div className="bg-gray-50 rounded-xl p-4 mb-5 text-left space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Subtotal</span>
-              <span className="font-semibold text-gray-800">${subtotal.toFixed(2)}</span>
+              <span className="font-semibold text-gray-800">£{subtotal.toFixed(2)}</span>
             </div>
-            
             {discountAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Discount</span>
-                <span className="font-semibold text-green-600">−${discountAmount.toFixed(2)}</span>
+                <span className="font-semibold text-green-600">−£{discountAmount.toFixed(2)}</span>
               </div>
             )}
             <div className="border-t border-gray-200 pt-2 flex justify-between text-base font-bold">
               <span className="text-gray-900">Total Paid</span>
-              <span className="text-red-500">${total.toFixed(2)}</span>
+              <span className="text-red-500">£{total.toFixed(2)}</span>
             </div>
           </div>
 
@@ -1546,10 +1271,6 @@ export default function CheckoutPage() {
           </button>
         </div>
       </Modal>
-
-
-
     </div>
-    // </ProtectedRoute>
   );
 }
