@@ -47,6 +47,8 @@ export interface CartItem {
 
 //   totalPrice: number;
 // }
+
+
 interface CartContextType {
     cart: CartItem[];
 
