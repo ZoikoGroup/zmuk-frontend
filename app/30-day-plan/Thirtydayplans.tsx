@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCart } from "../context/Cartcontext";
+import { useCart } from "../context/CartContext";
 import ChooseSimTypeModal from "../components/ChooseSimTypeModal";
 
 // .env.local -> NEXT_PUBLIC_API_URL

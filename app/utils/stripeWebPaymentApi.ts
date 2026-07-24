@@ -14,7 +14,14 @@
 // checkout POSTs each one to /api/v1/bqorders/ (each becomes its own row in
 // the matching admin section).
 
-import type { Plan, FormattedAddress } from "@/app/context/CartContext";
+// import type { Plan, FormattedAddress } from "@/app/context/CartContext";
+
+type Plan = any;
+
+type FormattedAddress = {
+  id?: string;
+  [key: string]: any;
+};
 
 type CartRow = Plan & {
   planType?: string;
