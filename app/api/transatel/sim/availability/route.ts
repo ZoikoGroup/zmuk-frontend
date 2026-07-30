@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   // Django returns that many of the latest available SIMs per type, plus the
   // requested / returned / shortfall / sufficient breakdown.
   const upstreamUrl = new URL(
-    "/api/v1/sim/sims/availability/latest/",
+    "/api/v1/sims/availability/latest/",
     DJANGO_API_BASE_URL,
   );
 

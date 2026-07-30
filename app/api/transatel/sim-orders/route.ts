@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.text(); // pass through verbatim
-  const upstreamUrl = new URL("/api/v1/sim/sim-orders/", DJANGO_API_BASE_URL);
+  const upstreamUrl = new URL("/api/v1/sims/sim-orders/", DJANGO_API_BASE_URL);
 
   // Forward the caller's auth header (DRF token / bearer) if present.
   const headers: Record<string, string> = {

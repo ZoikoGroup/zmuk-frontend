@@ -27,7 +27,6 @@ export interface AddressLike {
   zip?: string;
   phone?: string;
   email?: string;
-  [key: string]: unknown;
 }
 
 export interface ProcessOrderInput {
