@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -121,10 +122,11 @@ function Studentdeal() {
               managing a tight budget, and we are here to help students make the most of their mobile services,
               including a <span className="font-semibold text-yellow-300">hassle-free network switch.</span>
             </p>
-
+          <Link href="/student-discount-application">
             <button className="rounded-md bg-yellow-400 px-6 py-3 text-sm font-bold text-gray-900 transition-colors hover:bg-yellow-300">
               Register Now
             </button>
+          </Link>
           </div>
 
           {/* Photo grid */}
@@ -240,9 +242,11 @@ function Studentdeal() {
           </div>
 
           <div className="mt-8 flex justify-center gap-4">
+            <Link href="/student-discount-application">
             <button className="rounded-md bg-[#e6007e] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#c4007a]">
               Join Now
             </button>
+            </Link>
             <button className="rounded-md border border-green-600 px-6 py-2.5 text-sm font-semibold text-green-600 transition-colors hover:bg-green-50 dark:hover:bg-gray-700">
               Switch &amp; Save
             </button>

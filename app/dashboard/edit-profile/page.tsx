@@ -5,7 +5,7 @@ import { FaUser, FaLock, FaCheckCircle, FaExclamationCircle } from "react-icons/
 
 // Uses the same env var as the rest of the app. In .env.local:
 //   NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL  ;
 const UPDATE_PROFILE_URL = `${API_BASE}/api/accounts/update-profile/`;
 const CHANGE_PASSWORD_URL = `${API_BASE}/api/accounts/change-password/`;
 

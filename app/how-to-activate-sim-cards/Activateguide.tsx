@@ -116,7 +116,7 @@ function ActivateGuide() {
 
             {/* CTA */}
             <Link
-              href=""
+              href="/activate-your-sim"
               className="mt-6 block rounded-full bg-gradient-to-r from-[#f0568f] to-[#e6007e] py-3.5 text-center text-sm font-semibold text-white shadow-md transition-opacity hover:opacity-90"
             >
               Activate Your SIM

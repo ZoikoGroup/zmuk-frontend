@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-
-// .env.local -> NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+import beQuick from "../../utils/dasdbeQuickApi";
 
 // ---------- Types ----------
 interface Order {
@@ -18,32 +15,8 @@ interface Order {
   status?: string;
 }
 
-// Shape returned by /api/v1/bqorders/by-user/  (matches MyAccount.tsx)
-interface RawOrderEntry {
-  order_db_id?: number;
-  bequick_order_id?: string | number;
-  subscriber_id?: string | number;
-  total?: string | number;
-  created_at?: string;
-  payment_method?: string;
-  cart?: { name?: string; plan_name?: string; title?: string; product_name?: string }[];
-}
-interface ByUserResponse {
-  status?: boolean;
-  logged_user?: string;
-  groups?: Record<string, Record<string, RawOrderEntry[]>>;
-}
-
-// Turn a cart into a readable description
-function describeCart(cart?: RawOrderEntry["cart"]): string {
-  if (!cart || cart.length === 0) return "Plan Purchase";
-  const names = cart.map((c) => c.name || c.plan_name || c.title || c.product_name).filter(Boolean) as string[];
-  return names.length ? names.join(", ") : `${cart.length} item(s)`;
-}
-
 // ---------- Component ----------
 export default function OrdersPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -53,55 +26,31 @@ export default function OrdersPage() {
 
   const ITEMS_PER_PAGE = 6;
 
-  // ---------- Fetch Orders from OUR backend (same source as the dashboard card) ----------
+  // ---------- Fetch Orders ----------
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        setError(null);
 
-        const token = localStorage.getItem("zoiko_token");
-        if (!token) {
-          router.push("/login");
+        const userData = JSON.parse(localStorage.getItem("driverx_user") || "{}");
+        const userEmail: string = "info@golitemobile.com";
+
+        if (!userEmail) {
+          setError("User not found");
           return;
         }
 
-        const userData = JSON.parse(localStorage.getItem("zoiko_user") || "{}");
-        const email: string = userData?.email || "";
-        if (!email) {
-          setError("We couldn't find your account email. Please sign in again.");
+        const subscriberResult = await beQuick.getSubscriberByEmail(userEmail) as { subscriber_id: number } | false;
+
+        if (!subscriberResult || !subscriberResult.subscriber_id) {
+          setError("Subscriber not found");
           return;
         }
 
-        const res = await fetch(`${API_BASE}/api/v1/bqorders/by-user/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${token}`,
-          },
-          body: JSON.stringify({ logged_user: email }),
-        });
+        const SUBSCRIBER_ID = subscriberResult.subscriber_id;
 
-        if (!res.ok) throw new Error("Failed to load orders");
-
-        const data: ByUserResponse = await res.json();
-        const userGroups = data.groups?.[email] || {};
-
-        const flat: Order[] = [];
-        for (const [orderId, entries] of Object.entries(userGroups)) {
-          const entry = entries?.[0];
-          if (!entry) continue;
-          flat.push({
-            id: entry.order_db_id ?? orderId,
-            order_id: entry.bequick_order_id ?? orderId,
-            created_at: entry.created_at,
-            date: entry.created_at,
-            amount: entry.total ?? 0,
-            description: describeCart(entry.cart),
-            status: "completed",
-          });
-        }
-        setOrders(flat);
+        const ord = await beQuick.getOrders(SUBSCRIBER_ID) as { orders?: Order[]; data?: Order[] };
+        setOrders(ord?.orders || ord?.data || []);
       } catch (err) {
         console.error("Orders fetch error:", err);
         setError("Failed to load orders");
@@ -109,7 +58,7 @@ export default function OrdersPage() {
         setLoading(false);
       }
     })();
-  }, [router]);
+  }, []);
 
   // ---------- Filter + Search ----------
   const filteredOrders = useMemo(() => {
@@ -197,7 +146,7 @@ export default function OrdersPage() {
           {!loading && !error && filteredOrders.length === 0 && (
             <div className="text-center py-10">
               <h5 className="font-semibold">No Orders Found</h5>
-              <p className="text-gray-400">Your orders will appear here once you complete a purchase.</p>
+              <p className="text-gray-400">Try changing filters or search</p>
             </div>
           )}
 
@@ -232,7 +181,7 @@ export default function OrdersPage() {
                   </p>
 
                   <h5 className="text-green-600 font-bold mb-0">
-                    £{Number(order.amount || order.total || 0).toFixed(2)}
+                    ${Number(order.amount || order.total || 0).toFixed(2)}
                   </h5>
                 </div>
               );
@@ -243,7 +192,7 @@ export default function OrdersPage() {
           {totalPages > 1 && (
             <div className="flex justify-center mt-8 gap-2 flex-wrap">
               <button
-                className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-200 dark:border-gray-600"
+                className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage((p) => p - 1)}
               >
@@ -256,7 +205,7 @@ export default function OrdersPage() {
                   className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                     currentPage === i + 1
                       ? "bg-green-600 text-white"
-                      : "border border-gray-300 text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:border-gray-600"
+                      : "border border-gray-300 text-gray-700 hover:bg-gray-50"
                   }`}
                   onClick={() => setCurrentPage(i + 1)}
                 >
@@ -265,7 +214,7 @@ export default function OrdersPage() {
               ))}
 
               <button
-                className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-200 dark:border-gray-600"
+                className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage((p) => p + 1)}
               >

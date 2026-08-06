@@ -6,7 +6,32 @@ import StripePaymentForm, { StripePaymentFormRef } from "../components/StripePay
 import type { StripeElementsOptions } from "@stripe/stripe-js";
 import { isLoggedIn as checkIsLoggedIn, getUser } from "../utils/auth";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Raw shape written to localStorage["cart"] by the plan-selection page.
+ * Every line is a Transatel SIM plan — there are no other product types.
+ *
+ * Example:
+ * {
+ *   "cartKey": "plan-10-30-psim",
+ *   "id": 10,
+ *   "type": "plan",
+ *   "name": "Zoiko Saver Plus",
+ *   "slug": "zoiko-saver-plus",
+ *   "image": "",
+ *   "category": "SIM Only Plans",
+ *   "price": 4.5,
+ *   "quantity": 1,
+ *   "metadata": {
+ *     "simType": "psim",
+ *     "duration": 30,
+ *     "dataAllowance": "3GB",
+ *     "transatelID": "TSL_UK_DATA_1GB",
+ *     "tier": null
+ *   }
+ * }
+ */
 interface RawCartItem {
   cartKey?: string;
   id: string | number;

@@ -1,6 +1,9 @@
 // app/api/transatel/esim/[serial]/route.ts
 import { NextResponse } from "next/server";
-import { getEsimDetails, validSerial, TransatelError } from "../../../../../lib/transatel";
+import { getEsimDetails, validSerial, TransatelError } from "@/lib/transatel";
+
+export const runtime = "nodejs";        // Buffer + in-memory token cache need Node, not Edge
+export const dynamic = "force-dynamic"; // never cache a live lookup
 
 export async function GET(
   req: Request,
