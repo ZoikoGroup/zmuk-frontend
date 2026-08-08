@@ -14,6 +14,7 @@ import beQuick from "../utils/dasdbeQuickApi";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 const PINK = "#C12172";
+const NA = "Not available"; // shown wherever the backend has no data yet
 
 // ---------- Types ----------
 interface PlanDetails {
@@ -129,8 +130,8 @@ export default function MyAccountPage() {
   const [currentBill, setCurrentBill] = useState<{ total?: number; closed_at?: string } | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
 
-  // UI-only state for the new layout
-  const [autoPay, setAutoPay] = useState(true);
+  // UI-only state for the layout
+  const [autoPay, setAutoPay] = useState(false);
   const [contractOpen, setContractOpen] = useState(true);
   const [activeLineId, setActiveLineId] = useState<string | number | null>(null);
 
@@ -213,15 +214,10 @@ export default function MyAccountPage() {
   const domRemaining = dom.remaining !== undefined ? kbToGb(Number(dom.remaining)) : domTotal - domUsed;
   const dataRemainingPct = domTotal > 0 ? Math.round((domRemaining / domTotal) * 100) : 0;
 
-  const { formatted: activeUntil, remainingDays } = formatDateAndRemaining(planDetails?.service_period?.end_at);
+  const { formatted: activeUntil } = formatDateAndRemaining(planDetails?.service_period?.end_at);
   const hasPlan = !!planDetails?.current_plans?.[0];
   const planName = planDetails?.current_plans?.[0]?.name || "Zoiko Essentials";
   const activeLine = devices.find((d) => d.id === activeLineId) || devices[0];
-
-  // Voice / Texts are not in the BeQuick usage_summary payload yet — placeholders
-  // until the backend exposes them. Data ring below is real.
-  const voiceRemainingPct = 75;
-  const textsRemainingPct = 95;
 
   const navItems: NavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
@@ -267,7 +263,7 @@ export default function MyAccountPage() {
       {!loading && (
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row">
 
-          {/* ── Sidebar ── */}
+          {/* Sidebar */}
           <aside className="w-full shrink-0 lg:w-64">
             <div className="rounded-xl bg-white p-5 shadow-sm dark:bg-gray-800">
               <div className="flex flex-col items-center">
@@ -297,7 +293,7 @@ export default function MyAccountPage() {
             </div>
           </aside>
 
-          {/* ── Main ── */}
+          {/* Main */}
           <main className="flex-1 space-y-6">
             <div className="text-center">
               <h1 className="text-xl font-bold">
@@ -338,7 +334,7 @@ export default function MyAccountPage() {
                 </Link>
               </div>
 
-              {/* payment (card details are placeholders — no payment API in the data yet) */}
+              {/* payment (no payment API yet, so values show as "Not available") */}
               <div className="rounded-xl bg-white p-5 shadow-sm dark:bg-gray-800">
                 <div className="flex items-start justify-between">
                   <div>
@@ -348,10 +344,12 @@ export default function MyAccountPage() {
                 </div>
                 <div className="mt-4 flex items-center justify-between rounded-lg border border-gray-100 p-3 dark:border-gray-700">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-12 items-center justify-center rounded bg-blue-600 text-[10px] font-bold text-white">VISA</span>
+                    <span className="flex h-8 w-12 items-center justify-center rounded bg-gray-300 text-gray-600 dark:bg-gray-600 dark:text-gray-200">
+                      <CreditCard className="h-4 w-4" />
+                    </span>
                     <div>
-                      <p className="text-sm font-medium">Visa ending in 6159</p>
-                      <p className="text-xs text-gray-400">Expires 12/2030 <span className="text-gray-300">(Default)</span></p>
+                      <p className="text-sm font-medium">—</p>
+                      <p className="text-xs text-gray-400">{NA}</p>
                     </div>
                   </div>
                   <button className="flex items-center gap-1 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white dark:bg-gray-700">
@@ -414,7 +412,7 @@ export default function MyAccountPage() {
                   <Smartphone className="h-6 w-6 text-gray-400" />
                   <div className="flex-1">
                     <p className="text-xs text-gray-500">Active Plan</p>
-                    <p className="text-sm font-semibold">{planName} Postpaid</p>
+                    <p className="text-sm font-semibold">{planName}</p>
                   </div>
                   <Link href="/plans" className="text-xs font-semibold" style={{ color: PINK }}>+ Upgrade</Link>
                 </div>
@@ -426,10 +424,10 @@ export default function MyAccountPage() {
 
                 {contractOpen && (
                   <dl className="mt-2 divide-y divide-gray-100 text-sm dark:divide-gray-700">
-                    {/* rows without a live data source are placeholders */}
+                    {/* "—" = no live data source yet; the other rows are real */}
                     {[
-                      ["Contract Duration", "12 Months"],
-                      ["Installments Left", "10"],
+                      ["Contract Duration", "—"],
+                      ["Installments Left", "—"],
                       ["Next Bill Due on", `${nextPayment}  |  Amount: $${Number(billTotal).toFixed(2)}`],
                       ["Contract Validity Date", activeUntil],
                       ["IMEI & SIM Number", maskImei(activeLine?.imei)],
@@ -452,7 +450,7 @@ export default function MyAccountPage() {
                   </Link>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {/* Data — real */}
+                  {/* Data (real) */}
                   <div className="flex items-center gap-3 rounded-lg border border-gray-100 p-3 dark:border-gray-700">
                     <div>
                       <p className="text-xs text-gray-500">Data</p>
@@ -461,23 +459,23 @@ export default function MyAccountPage() {
                     </div>
                     <div className="ml-auto"><UsageRing pct={dataRemainingPct} /></div>
                   </div>
-                  {/* Voice — placeholder */}
+                  {/* Voice (no data source yet) */}
                   <div className="flex items-center gap-3 rounded-lg border border-gray-100 p-3 dark:border-gray-700">
                     <div>
                       <p className="text-xs text-gray-500">Voice</p>
-                      <p className="text-lg font-bold">250</p>
-                      <p className="text-xs text-gray-400">Remaining</p>
+                      <p className="text-lg font-bold">—</p>
+                      <p className="text-xs text-gray-400">{NA}</p>
                     </div>
-                    <div className="ml-auto"><UsageRing pct={voiceRemainingPct} /></div>
+                    <div className="ml-auto"><UsageRing pct={0} /></div>
                   </div>
-                  {/* Texts — placeholder */}
+                  {/* Texts (no data source yet) */}
                   <div className="flex items-center gap-3 rounded-lg border border-gray-100 p-3 dark:border-gray-700">
                     <div>
                       <p className="text-xs text-gray-500">Texts</p>
-                      <p className="text-lg font-bold">20000</p>
-                      <p className="text-xs text-gray-400">Remaining</p>
+                      <p className="text-lg font-bold">—</p>
+                      <p className="text-xs text-gray-400">{NA}</p>
                     </div>
-                    <div className="ml-auto"><UsageRing pct={textsRemainingPct} /></div>
+                    <div className="ml-auto"><UsageRing pct={0} /></div>
                   </div>
                 </div>
               </div>
