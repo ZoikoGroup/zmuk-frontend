@@ -13,7 +13,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 // ─── OPTIONS ─────────────────────────────────────────────────────────────────
 
 const titleOptions = ["Mr", "Mrs", "Ms", "Miss", "Dr"];
-const packageOptions = ["Everyday 3GB+", "Everyday 5GB+", "Everyday 10GB+", "Unlimited Data"];
+const packageOptions = [
+  "Everyday 3GB+",
+  "Everyday 5GB+",
+  "Everyday 10GB+",
+  "Unlimited Data",
+];
 
 type FormState = {
   username: string;
@@ -33,8 +38,7 @@ type FormState = {
 
 type Errors = Partial<Record<keyof FormState, string>>;
 type Status = "idle" | "submitting" | "success" | "error";
-// OTP flow: idle -> sending -> sent -> (verifying) -> verified
-type OtpPhase = "idle" | "sending" | "sent" | "verifying" | "verified";
+type OtpPhase = "idle" | "verifying" | "verified";
 
 const initialForm: FormState = {
   username: "",
@@ -62,14 +66,17 @@ function validate(form: FormState): Errors {
   if (!form.username.trim()) e.username = "Username is required.";
 
   if (!form.email.trim()) e.email = "Email is required.";
-  else if (!EMAIL_RE.test(form.email.trim())) e.email = "Enter a valid email address.";
+  else if (!EMAIL_RE.test(form.email.trim()))
+    e.email = "Enter a valid email address.";
 
   if (!form.otp.trim()) e.otp = "OTP is required.";
-  else if (!/^\d{6}$/.test(form.otp.trim())) e.otp = "OTP must be exactly 6 digits.";
+  else if (!/^\d{6}$/.test(form.otp.trim()))
+    e.otp = "OTP must be exactly 6 digits.";
 
   const serialDigits = form.simSerial.replace(/\s+/g, "");
   if (!serialDigits) e.simSerial = "SIM serial number is required.";
-  else if (!/^\d{18,22}$/.test(serialDigits)) e.simSerial = "SIM serial (ICCID) must be 18–22 digits.";
+  else if (!/^\d{18,22}$/.test(serialDigits))
+    e.simSerial = "SIM serial (ICCID) must be 18–22 digits.";
 
   if (!form.lastName.trim()) e.lastName = "Last name is required.";
   if (!form.firstName.trim()) e.firstName = "First name is required.";
@@ -102,7 +109,11 @@ function validate(form: FormState): Errors {
 const inputBase =
   "w-full rounded-md border px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500";
 
-function inputClasses(hasError?: boolean, dashed?: boolean, disabled?: boolean) {
+function inputClasses(
+  hasError?: boolean,
+  dashed?: boolean,
+  disabled?: boolean,
+) {
   const state = hasError
     ? "border-red-500 focus:ring-red-500 dark:border-red-500"
     : "border-gray-300 focus:ring-blue-500 dark:border-gray-600";
@@ -123,10 +134,24 @@ type FieldProps = {
   disabled?: boolean;
 };
 
-function Field({ label, name, value, onChange, error, type = "text", placeholder, dashed, full, disabled }: FieldProps) {
+function Field({
+  label,
+  name,
+  value,
+  onChange,
+  error,
+  type = "text",
+  placeholder,
+  dashed,
+  full,
+  disabled,
+}: FieldProps) {
   return (
     <div className={full ? "md:col-span-2" : ""}>
-      <label htmlFor={name} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+      <label
+        htmlFor={name}
+        className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200"
+      >
         {label}
       </label>
       <input
@@ -142,7 +167,10 @@ function Field({ label, name, value, onChange, error, type = "text", placeholder
         className={inputClasses(Boolean(error), dashed, disabled)}
       />
       {error && (
-        <p id={`${name}-error`} className="mt-1 text-xs text-red-600 dark:text-red-400">
+        <p
+          id={`${name}-error`}
+          className="mt-1 text-xs text-red-600 dark:text-red-400"
+        >
           {error}
         </p>
       )}
@@ -160,10 +188,21 @@ type SelectProps = {
   disabled?: boolean;
 };
 
-function SelectField({ label, name, value, onChange, options, error, disabled }: SelectProps) {
+function SelectField({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+  error,
+  disabled,
+}: SelectProps) {
   return (
     <div>
-      <label htmlFor={name} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+      <label
+        htmlFor={name}
+        className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200"
+      >
         {label}
       </label>
       <select
@@ -183,7 +222,10 @@ function SelectField({ label, name, value, onChange, options, error, disabled }:
         ))}
       </select>
       {error && (
-        <p id={`${name}-error`} className="mt-1 text-xs text-red-600 dark:text-red-400">
+        <p
+          id={`${name}-error`}
+          className="mt-1 text-xs text-red-600 dark:text-red-400"
+        >
           {error}
         </p>
       )}
@@ -229,26 +271,21 @@ export default function Activateform() {
         setSimMsg(res.error);
       } else {
         setSimCheck("notfound");
-        setSimMsg("This SIM isn't recognised yet — double-check the number, or it may not be provisioned.");
+        setSimMsg(
+          "This SIM isn't recognised yet — double-check the number, or it may not be provisioned.",
+        );
       }
     } catch {
       setSimCheck("error");
       setSimMsg("Couldn't reach the SIM lookup service. You can still submit.");
     }
   };
-  // Every field except email + OTP stays greyed-out until the email is verified.
-  const lockRest = !otpVerified;
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
-
-    // If the email changes after a code was sent, reset the whole OTP flow.
-    if (name === "email" && otpPhase !== "idle") {
-      setOtpPhase("idle");
-      setOtpMessage(null);
-      setForm((f) => ({ ...f, otp: "" }));
-    }
 
     // Clear a field's error as the user edits it.
     setErrors((prev) => {
@@ -257,35 +294,6 @@ export default function Activateform() {
       delete next[name as keyof FormState];
       return next;
     });
-  };
-
-  // ── Generate / send the code (uses the email above) ──
-  const requestOtp = async () => {
-    setOtpMessage(null);
-    const email = form.email.trim();
-    if (!EMAIL_RE.test(email)) {
-      setErrors((p) => ({ ...p, email: "Enter a valid email address first." }));
-      return;
-    }
-    setOtpPhase("sending");
-    try {
-      const res = await fetch(`${API_BASE}/api/otp/request/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json().catch(() => null);
-      if (res.ok) {
-        setOtpPhase("sent");
-        setOtpMessage((data && data.message) || "A 6-digit code has been sent to your email.");
-      } else {
-        setOtpPhase("idle");
-        setOtpMessage((data && data.detail) || `Could not send code (status ${res.status}).`);
-      }
-    } catch {
-      setOtpPhase("idle");
-      setOtpMessage("Could not reach the server. Please try again.");
-    }
   };
 
   // ── Verify the code ──
@@ -306,14 +314,16 @@ export default function Activateform() {
       const data = await res.json().catch(() => null);
       if (res.ok && data && data.verified) {
         setOtpPhase("verified");
-        setOtpMessage("Email verified — you can now complete the form below.");
+        setOtpMessage("OTP verified successfully.");
         setErrors((p) => ({ ...p, otp: undefined }));
       } else {
-        setOtpPhase("sent");
-        setOtpMessage((data && data.detail) || "Incorrect code. Please try again.");
+        setOtpPhase("idle");
+        setOtpMessage(
+          (data && data.detail) || "Incorrect code. Please try again.",
+        );
       }
     } catch {
-      setOtpPhase("sent");
+      setOtpPhase("idle");
       setOtpMessage("Could not reach the server. Please try again.");
     }
   };
@@ -323,7 +333,7 @@ export default function Activateform() {
     setServerError(null);
 
     if (!otpVerified) {
-      setServerError("Please verify your email with the OTP before submitting.");
+      setServerError("Please verify your OTP before submitting.");
       return;
     }
 
@@ -360,7 +370,9 @@ export default function Activateform() {
         for (const key of Object.keys(data)) {
           if (key in initialForm) {
             const msg = (data as Record<string, unknown>)[key];
-            fieldErrors[key as keyof FormState] = Array.isArray(msg) ? String(msg[0]) : String(msg);
+            fieldErrors[key as keyof FormState] = Array.isArray(msg)
+              ? String(msg[0])
+              : String(msg);
           }
         }
         setErrors(fieldErrors);
@@ -368,33 +380,41 @@ export default function Activateform() {
         if (typeof data.detail === "string") {
           setServerError(data.detail);
         } else if (Object.keys(fieldErrors).length === 0) {
-          setServerError("Something went wrong. Please check your details and try again.");
+          setServerError(
+            "Something went wrong. Please check your details and try again.",
+          );
         }
       } else {
-        setServerError(`Request failed (status ${res.status}). Please try again.`);
+        setServerError(
+          `Request failed (status ${res.status}). Please try again.`,
+        );
       }
 
       setStatus("error");
     } catch {
-      setServerError("Could not reach the server. Please check your connection and try again.");
+      setServerError(
+        "Could not reach the server. Please check your connection and try again.",
+      );
       setStatus("error");
     }
   };
 
-  const codeSent = otpPhase === "sent" || otpPhase === "verifying";
-
   return (
     <section className="bg-white px-4 py-12 sm:px-6 md:px-8 dark:bg-gray-900 dark:text-white ">
       <div className="mx-auto max-w-4xl">
-        <h1 className="text-center text-2xl font-bold text-gray-800 dark:text-white">Activate Your SIM</h1>
+        <h1 className="text-center text-2xl font-bold text-gray-800 dark:text-white">
+          Activate Your SIM
+        </h1>
         <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
-          Get started with our services! Enter your email and verify the OTP to unlock the form, then complete your details.
+          Get started with our services! Complete your details below and verify
+          your OTP to submit your SIM activation request.
         </p>
 
         {/* Success banner */}
         {status === "success" && (
           <div className="mt-6 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-300">
-            Your SIM activation request has been received. We&rsquo;ll be in touch shortly.
+            Your SIM activation request has been received. We&rsquo;ll be in
+            touch shortly.
           </div>
         )}
 
@@ -407,12 +427,28 @@ export default function Activateform() {
 
         <form onSubmit={handleSubmit} noValidate className="mt-6">
           <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
-            <Field label="Username:" name="username" value={form.username} onChange={handleChange} error={errors.username} disabled={lockRest} />
-            <Field label="Email:" name="email" type="email" value={form.email} onChange={handleChange} error={errors.email} disabled={otpVerified} />
+            <Field
+              label="Username:"
+              name="username"
+              value={form.username}
+              onChange={handleChange}
+              error={errors.username}
+            />
+            <Field
+              label="Email:"
+              name="email"
+              type="email"
+              value={form.email}
+              onChange={handleChange}
+              error={errors.email}
+            />
 
-            {/* OTP Code + Generate/Verify buttons */}
+            {/* OTP Code + Verify button */}
             <div className="md:col-span-2">
-              <label htmlFor="otp" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+              <label
+                htmlFor="otp"
+                className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200"
+              >
                 OTP Code:
               </label>
               <div className="flex flex-col gap-3 sm:flex-row">
@@ -428,43 +464,45 @@ export default function Activateform() {
                 />
                 <button
                   type="button"
-                  onClick={requestOtp}
-                  disabled={otpPhase === "sending" || otpPhase === "verifying" || otpVerified}
-                  className="shrink-0 rounded bg-[#1d6fd8] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#175bb5] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {otpPhase === "sending"
-                    ? "Sending…"
-                    : otpVerified
-                    ? "Verified"
-                    : codeSent
-                    ? "Resend OTP"
-                    : "Generate OTP"}
-                </button>
-                <button
-                  type="button"
                   onClick={verifyOtp}
-                  disabled={!codeSent || otpPhase === "verifying" || otpVerified}
+                  disabled={otpPhase === "verifying" || otpVerified}
                   className="shrink-0 rounded bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {otpPhase === "verifying" ? "Verifying…" : "Verify"}
+                  {otpPhase === "verifying"
+                    ? "Verifying…"
+                    : otpVerified
+                      ? "Verified"
+                      : "Verify OTP"}
                 </button>
               </div>
-              {errors.otp && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.otp}</p>}
-              {otpMessage && (
-                <p className={`mt-2 text-sm ${otpVerified ? "text-green-700 dark:text-green-400" : "text-gray-600 dark:text-gray-400"}`}>
-                  {otpMessage}
+
+              {/* Green Note explaining OTP retrieval */}
+              <div className="mt-2.5 rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-900/60 dark:bg-green-950/40 dark:text-green-300">
+                <strong>Note:</strong> You will receive your OTP via email for
+                eSIMs, or you can find your OTP printed directly on your
+                physical SIM package.
+              </div>
+
+              {errors.otp && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.otp}
                 </p>
               )}
-              {!otpVerified && !otpMessage && (
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  Verify your email to unlock the fields below.
+              {otpMessage && (
+                <p
+                  className={`mt-2 text-sm ${otpVerified ? "text-green-700 dark:text-green-400" : "text-gray-600 dark:text-gray-400"}`}
+                >
+                  {otpMessage}
                 </p>
               )}
             </div>
 
             {/* SIM Serial + live Transatel check */}
             <div>
-              <label htmlFor="simSerial" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+              <label
+                htmlFor="simSerial"
+                className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200"
+              >
                 SIM Serial Number:
               </label>
               <input
@@ -473,12 +511,13 @@ export default function Activateform() {
                 value={form.simSerial}
                 onChange={handleChange}
                 onBlur={(e) => runSimCheck(e.target.value)}
-                disabled={lockRest}
                 aria-invalid={errors.simSerial ? true : undefined}
-                className={inputClasses(Boolean(errors.simSerial), false, lockRest)}
+                className={inputClasses(Boolean(errors.simSerial))}
               />
               {errors.simSerial && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.simSerial}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.simSerial}
+                </p>
               )}
               {simMsg && (
                 <p
@@ -486,27 +525,84 @@ export default function Activateform() {
                     simCheck === "found"
                       ? "text-green-700 dark:text-green-400"
                       : simCheck === "notfound" || simCheck === "error"
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-gray-500 dark:text-gray-400"
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   {simMsg}
                 </p>
               )}
             </div>
-            <SelectField label="Title:" name="title" value={form.title} onChange={handleChange} options={titleOptions} error={errors.title} disabled={lockRest} />
+            <SelectField
+              label="Title:"
+              name="title"
+              value={form.title}
+              onChange={handleChange}
+              options={titleOptions}
+              error={errors.title}
+            />
 
-            <Field label="Last Name:" name="lastName" value={form.lastName} onChange={handleChange} error={errors.lastName} disabled={lockRest} />
-            <Field label="First Name:" name="firstName" value={form.firstName} onChange={handleChange} error={errors.firstName} disabled={lockRest} />
+            <Field
+              label="Last Name:"
+              name="lastName"
+              value={form.lastName}
+              onChange={handleChange}
+              error={errors.lastName}
+            />
+            <Field
+              label="First Name:"
+              name="firstName"
+              value={form.firstName}
+              onChange={handleChange}
+              error={errors.firstName}
+            />
 
-            <Field label="Date of Birth:" name="dob" type="date" value={form.dob} onChange={handleChange} error={errors.dob} disabled={lockRest} />
-            <SelectField label="Your Zoiko Package:" name="zoikoPackage" value={form.zoikoPackage} onChange={handleChange} options={packageOptions} error={errors.zoikoPackage} disabled={lockRest} />
+            <Field
+              label="Date of Birth:"
+              name="dob"
+              type="date"
+              value={form.dob}
+              onChange={handleChange}
+              error={errors.dob}
+            />
+            <SelectField
+              label="Your Zoiko Package:"
+              name="zoikoPackage"
+              value={form.zoikoPackage}
+              onChange={handleChange}
+              options={packageOptions}
+              error={errors.zoikoPackage}
+            />
 
-            <Field label="Country:" name="country" value={form.country} onChange={handleChange} error={errors.country} disabled={lockRest} />
-            <Field label="Postcode/Zip code:" name="postcode" value={form.postcode} onChange={handleChange} error={errors.postcode} disabled={lockRest} />
+            <Field
+              label="Country:"
+              name="country"
+              value={form.country}
+              onChange={handleChange}
+              error={errors.country}
+            />
+            <Field
+              label="Postcode/Zip code:"
+              name="postcode"
+              value={form.postcode}
+              onChange={handleChange}
+              error={errors.postcode}
+            />
 
-            <Field label="City:" name="city" value={form.city} onChange={handleChange} error={errors.city} disabled={lockRest} />
-            <Field label="Address:" name="address" value={form.address} onChange={handleChange} error={errors.address} disabled={lockRest} />
+            <Field
+              label="City:"
+              name="city"
+              value={form.city}
+              onChange={handleChange}
+              error={errors.city}
+            />
+            <Field
+              label="Address:"
+              name="address"
+              value={form.address}
+              onChange={handleChange}
+              error={errors.address}
+            />
           </div>
 
           {/* Buttons */}
@@ -520,7 +616,9 @@ export default function Activateform() {
             </button>
             <Link
               href="/account"
-              className="rounded bg-[#1d6fd8] py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-[#175bb5]"
+              className={`flex items-center justify-center rounded bg-[#1d6fd8] py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-[#175bb5] ${
+                status === "submitting" ? "pointer-events-none opacity-60" : ""
+              }`}
             >
               Back to My Account
             </Link>
