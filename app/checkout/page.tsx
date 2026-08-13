@@ -5,6 +5,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import StripePaymentForm, { StripePaymentFormRef } from "../components/StripePaymentForm";
 import type { StripeElementsOptions } from "@stripe/stripe-js";
 import { isLoggedIn as checkIsLoggedIn, getUser } from "../utils/auth";
+import { processOrder } from "../utils/ProcessOrder";
 
 
 interface RawCartItem {
@@ -281,6 +282,8 @@ export default function CheckoutPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [showTermsPopup, setShowTermsPopup] = useState(false);
+  // Shipping is optional and hidden by default. When off, we ship to billing.
+  const [shipToDifferent, setShipToDifferent] = useState(false);
 
   // Stripe's cross-origin iframe can't inherit page dark styling; it only obeys
   // the `appearance` object handed to it. So we detect dark mode by MEASURING
@@ -419,8 +422,9 @@ export default function CheckoutPage() {
   // ── Derived helpers ───────────────────────────────────────────────────────
 
   /**
-   * Physical (pSIM) items are shipped, so they require a shipping address.
-   * eSIMs are delivered by email and need none.
+   * Physical (pSIM) items are shipped. We still let the customer choose a
+   * separate shipping address, but it's optional — by default a physical SIM
+   * ships to the billing address and an eSIM needs no address at all.
    */
   const hasPhysicalSim = cart.some((item) => item.simTypeKey === "psim");
 
@@ -481,7 +485,7 @@ export default function CheckoutPage() {
     setLoading(true);
     setCouponMessage("");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/apply-coupon/`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/apply-coupon/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -585,8 +589,8 @@ export default function CheckoutPage() {
     newErrors.billingEmail = emailRx.test(billingAddress.email) ? "" : "Invalid email";
     newErrors.billingPhone = validatePhone(billingAddress.phone);
 
-    // Shipping is required only when the cart contains a physical SIM.
-    if (hasPhysicalSim) {
+    // Shipping is validated only when the user opts into a different address.
+    if (shipToDifferent) {
       newErrors.shippingFirstName = shippingAddress.firstName ? "" : "Required";
       newErrors.shippingLastName = shippingAddress.lastName ? "" : "Required";
       newErrors.shippingCity = shippingAddress.city ? "" : "Required";
@@ -621,6 +625,21 @@ export default function CheckoutPage() {
     }
 
     setErrors((prev) => ({ ...prev, [errKey]: msg }));
+  };
+
+  // Toggle the "ship to a different address" section. When turned off, clear
+  // any pending shipping errors so a hidden form can never block submit.
+  const handleToggleShipToDifferent = (checked: boolean) => {
+    setShipToDifferent(checked);
+    if (!checked) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((k) => {
+          if (k.startsWith("shipping")) delete next[k];
+        });
+        return next;
+      });
+    }
   };
 
   // Build the order line items. transatelID + simType drive server-side SIM
@@ -678,7 +697,9 @@ export default function CheckoutPage() {
         email: billingAddress.email || user?.email || "",
         country_code: "UK",
         billingAddress,
-        shippingAddress: hasPhysicalSim ? shippingAddress : billingAddress,
+        // Ship to the chosen address only when the customer opted in;
+        // otherwise the billing address is used for delivery.
+        shippingAddress: shipToDifferent ? shippingAddress : billingAddress,
         coupon: discountData ? { ...discountData } : null,
         items: buildItems(),
         totals: { subtotal, discount: discountAmount, total },
@@ -693,17 +714,11 @@ export default function CheckoutPage() {
       // Transatel SIM order: the backend reserves a SIM per line (matched by
       // simType), assigns it to this order, and activates it via the Transatel
       // API using the plan's transatelID as the package code.
-      const orderRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/sim-orders/`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify(orderPayload),
-        },
-      );
-      const orderResData = await orderRes.json().catch(() => ({}));
+      
+       const orderRes = await processOrder(orderPayload, headers);
+      const orderResData = orderRes.data;
       console.log(
-        "✅ Django response ok:", orderRes.ok,
+        "✅ Order flow ok:", orderRes.ok,
         "status:", orderRes.status, "data:", orderResData,
       );
 
@@ -714,12 +729,12 @@ export default function CheckoutPage() {
       }
 
       // Order saved — clear the cart so it isn't re-submitted.
-      try {
-        localStorage.removeItem("cart");
-        window.dispatchEvent(new Event("cart-updated"));
-      } catch {
-        /* ignore storage errors */
-      }
+      // try {
+      //   localStorage.removeItem("cart");
+      //   window.dispatchEvent(new Event("cart-updated"));
+      // } catch {
+      //   /* ignore storage errors */
+      // }
       setShowThankYou(true);
     } catch (err: unknown) {
       console.error("❌ caught error:", err);
@@ -927,33 +942,47 @@ export default function CheckoutPage() {
                 onValidateField={validateOneField}
               />
 
-              {/* Shipping is required for physical SIMs, hidden for eSIM-only carts. */}
-              {hasPhysicalSim ? (
-                <div className="mt-5 pt-5 border-t border-gray-100">
-                  <div className="flex items-center gap-2 mb-4">
-                    <h3 className="font-semibold text-gray-800 dark:text-gray-200">Shipping Address</h3>
-                    <span className="bg-teal-50 text-teal-700 text-xs font-bold px-2 py-0.5 rounded">
-                      Required for physical SIM
-                    </span>
-                  </div>
-                  <AddressForm
-                    address={shippingAddress}
-                    setAddress={setShippingAddress}
-                    prefix="shipping"
-                    errors={errors}
-                    loading={loading}
-                    includeShipping
-                    onValidateField={validateOneField}
+              {/* Shipping is optional — hidden by default, revealed by the checkbox.
+                  When off, the order ships to the billing address. */}
+              <div className="mt-5 pt-5 border-t border-gray-100">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={shipToDifferent}
+                    onChange={(e) => handleToggleShipToDifferent(e.target.checked)}
+                    disabled={loading}
+                    className="w-4 h-4 mt-0.5 accent-red-500"
                   />
-                </div>
-              ) : (
-                <p className="mt-5 pt-5 border-t border-gray-100 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                  <svg className="w-4 h-4 shrink-0 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Your eSIM will be delivered by email — no shipping address needed.
-                </p>
-              )}
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Ship to a different address
+                    <span className="block text-xs text-gray-400 font-normal">
+                      {hasPhysicalSim
+                        ? "Your physical SIM ships to your billing address unless you add a different one."
+                        : "Your eSIM is delivered by email — only add this if you want physical delivery elsewhere."}
+                    </span>
+                  </span>
+                </label>
+
+                {shipToDifferent && (
+                  <div className="mt-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <h3 className="font-semibold text-gray-800 dark:text-gray-200">Shipping Address</h3>
+                      <span className="bg-teal-50 text-teal-700 text-xs font-bold px-2 py-0.5 rounded">
+                        Where should we ship?
+                      </span>
+                    </div>
+                    <AddressForm
+                      address={shippingAddress}
+                      setAddress={setShippingAddress}
+                      prefix="shipping"
+                      errors={errors}
+                      loading={loading}
+                      includeShipping
+                      onValidateField={validateOneField}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1162,7 +1191,7 @@ export default function CheckoutPage() {
         onClose={() => {
           setShowThankYou(false);
           setCart([]);
-          window.location.href = "/dashboard";
+          // window.location.href = "/dashboard";
         }}
         title=""
       >
@@ -1207,7 +1236,7 @@ export default function CheckoutPage() {
             onClick={() => {
               setShowThankYou(false);
               setCart([]);
-              window.location.href = "/dashboard";
+              // window.location.href = "/dashboard";
             }}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white font-bold text-sm transition-all shadow-md hover:shadow-lg mb-2"
           >
