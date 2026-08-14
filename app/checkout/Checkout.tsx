@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import type { StripeElementsOptions } from "@stripe/stripe-js";
-import { processOrderStripe } from "../utils/stripeWebPaymentApi";
+import { processOrderStripe } from "../utils/beQuickStripeWebPaymentApi";
 import StripePaymentForm, { StripePaymentFormRef } from "../components/StripePaymentForm";
 
 // ─────────────────────────────────────────────────────────────────────────────
