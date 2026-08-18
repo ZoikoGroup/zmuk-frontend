@@ -8,11 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
  * checkout flow still calls POST /api/v1/sim/sims/reserve/ or
  * POST /api/v1/sim/sim-orders/ on the Django side to actually hold/assign one.
  *
- * Query params (optional):
- *   sim_type = "esim" | "psim"   — restrict to a delivery type
- *
  * Response:
- *   200 { success: true, iccid, msisdn, sim_type, provisioning_status }
+ *   200 { success: true, iccid, msisdn, provisioning_status }
  *   404 { success: false, message: "No available SIMs in stock." }
  *   502 { success: false, message: "..." }  — backend unreachable / bad response
  */
@@ -25,7 +22,7 @@ const DJANGO_API_BASE_URL =
   process.env.DJANGO_API_URL ||
   process.env.NEXT_PUBLIC_API_URL;
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   if (!DJANGO_API_BASE_URL) {
     return NextResponse.json(
       { success: false, message: "Backend API URL is not configured." },
@@ -33,19 +30,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const simType = request.nextUrl.searchParams.get("sim_type");
-  if (simType && simType !== "esim" && simType !== "psim") {
-    return NextResponse.json(
-      { success: false, message: "sim_type must be 'esim' or 'psim'." },
-      { status: 400 },
-    );
-  }
-
   const upstreamUrl = new URL(
     "/api/v1/sim/sims/availability/latest/",
     DJANGO_API_BASE_URL,
   );
-  if (simType) upstreamUrl.searchParams.set("sim_type", simType);
 
   try {
     const upstreamRes = await fetch(upstreamUrl.toString(), {

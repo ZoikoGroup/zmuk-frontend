@@ -6,8 +6,7 @@ import Link from "next/link";
 // .env.local -> NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
-/** Shape returned by GET /api/blog/posts/ (BlogPostListSerializer).
- *  Note: no `content` — the list endpoint deliberately omits it. */
+/** GET /api/blog/posts/ (BlogPostListSerializer — no `content`) */
 export interface BlogListItem {
   id: number;
   title: string;
@@ -37,8 +36,6 @@ export function formatDate(iso: string): string {
   });
 }
 
-/** featured_image is absolute when DRF has the request in context, but stays
- *  relative in some setups. Handle both. */
 export function imageUrl(src: string | null): string | null {
   if (!src) return null;
   if (src.startsWith("http")) return src;
@@ -47,23 +44,36 @@ export function imageUrl(src: string | null): string | null {
 
 // ── card ────────────────────────────────────────────────────────────────────
 
-function BlogCard({ post }: { post: BlogListItem }) {
-  const img = imageUrl(post.featured_image);
+function CardImage({ src, alt }: { src: string | null; alt: string }) {
+  const [failed, setFailed] = useState(false);
 
+  // A 404 on /media/ otherwise renders a broken-image icon with the alt text
+  // sprawled across the card. Fall back to the brand gradient instead.
+  if (!src || failed) {
+    return (
+      <div className="flex h-48 w-full items-center justify-center bg-gradient-to-br from-green-600 to-teal-500">
+        <span className="px-4 text-center text-xs font-semibold text-white/90">{alt}</span>
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setFailed(true)}
+      className="h-48 w-full object-cover"
+      loading="lazy"
+    />
+  );
+}
+
+function BlogCard({ post }: { post: BlogListItem }) {
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-md transition-shadow hover:shadow-lg dark:border-gray-700 dark:bg-gray-800">
       <Link href={`/blogs/${post.slug}`} className="block">
-        {img ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={img}
-            alt={post.title}
-            className="h-48 w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="h-48 w-full bg-gradient-to-r from-green-600 to-teal-500" />
-        )}
+        <CardImage src={imageUrl(post.featured_image)} alt={post.title} />
       </Link>
 
       <div className="flex flex-1 flex-col p-5">
@@ -145,7 +155,7 @@ function Blogs() {
   return (
     <div className="bg-gray-50 dark:bg-gray-900">
       {/* Banner */}
-      <div className="bg-gradient-to-r from-green-600 to-teal-500 px-4 py-8 text-center">
+      <div className="bg-gradient-to-r from-green-600 to-teal-500 px-4 py-10 text-center">
         <h1 className="text-2xl font-bold text-white sm:text-3xl">
           Zoiko&rsquo;s Latest Tech Tea
         </h1>
@@ -172,9 +182,7 @@ function Blogs() {
 
         {!loading && !error && posts.length === 0 && (
           <div className="rounded-2xl border border-gray-100 bg-white p-12 text-center dark:border-gray-700 dark:bg-gray-800">
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-              No posts yet
-            </p>
+            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">No posts yet</p>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Add a post in the Django admin and set its status to Published.
             </p>

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { sanitizeArticleHtml } from "@/lib/sanitizeArticle";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
-/** GET /api/blog/posts/<slug>/ (BlogPostSerializer) */
+/** GET /api/blog/posts/<slug>/ */
 interface BlogPost {
   id: number;
   title: string;
@@ -23,7 +24,7 @@ interface BlogPost {
   updated_at: string;
 }
 
-/** GET /api/blog/posts/<slug>/related/ (BlogPostListSerializer, unpaginated) */
+/** GET /api/blog/posts/<slug>/related/ — unpaginated array */
 interface RelatedPost {
   id: number;
   title: string;
@@ -31,6 +32,8 @@ interface RelatedPost {
   featured_image: string | null;
   created_at: string;
 }
+
+// ── helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -54,25 +57,94 @@ function imageUrl(src: string | null): string | null {
   return `${API_BASE}${src.startsWith("/") ? "" : "/"}${src}`;
 }
 
-// CKEditor returns raw HTML with no classes. These arbitrary variants style it
-// without needing the @tailwindcss/typography plugin.
-const ARTICLE_HTML_CLASSES = [
-  "text-sm leading-relaxed text-gray-600 dark:text-gray-300",
-  "[&_h1]:mt-8 [&_h1]:mb-3 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-gray-800 dark:[&_h1]:text-white",
-  "[&_h2]:mt-8 [&_h2]:mb-3 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-gray-800 dark:[&_h2]:text-white",
-  "[&_h3]:mt-6 [&_h3]:mb-2 [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-gray-800 dark:[&_h3]:text-white",
+/**
+ * Article typography. These are ordinary Tailwind arbitrary variants with
+ * proper `dark:` pairs — no !important, no forced light surface.
+ *
+ * They work because sanitizeArticleHtml() has already stripped the inline
+ * colour/background/font declarations that used to override them.
+ */
+const ARTICLE_CLASSES = [
+  "text-sm leading-relaxed text-gray-700 dark:text-gray-300",
+
+  // Headings
+  "[&_h1]:mt-8 [&_h1]:mb-3 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:leading-snug [&_h1]:text-gray-900 dark:[&_h1]:text-white",
+  "[&_h2]:mt-8 [&_h2]:mb-3 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:leading-snug [&_h2]:text-gray-900 dark:[&_h2]:text-white",
+  "[&_h3]:mt-6 [&_h3]:mb-2 [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-gray-900 dark:[&_h3]:text-white",
+  "[&_h4]:mt-5 [&_h4]:mb-2 [&_h4]:text-sm [&_h4]:font-bold [&_h4]:text-gray-900 dark:[&_h4]:text-white",
+
+  // Body
   "[&_p]:mb-4",
-  "[&_a]:font-medium [&_a]:text-[#e6007e] [&_a]:underline hover:[&_a]:no-underline",
-  "[&_ul]:mb-4 [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-6",
-  "[&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:space-y-1.5 [&_ol]:pl-6",
-  "[&_strong]:font-semibold [&_strong]:text-gray-800 dark:[&_strong]:text-white",
-  "[&_img]:my-6 [&_img]:mx-auto [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-xl",
-  "[&_figure]:my-6 [&_figcaption]:mt-2 [&_figcaption]:text-center [&_figcaption]:text-xs [&_figcaption]:text-gray-400",
-  "[&_blockquote]:my-5 [&_blockquote]:border-l-4 [&_blockquote]:border-green-500 [&_blockquote]:bg-gray-50 [&_blockquote]:py-3 [&_blockquote]:pl-4 [&_blockquote]:italic dark:[&_blockquote]:bg-gray-900",
-  "[&_table]:my-5 [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs",
-  "[&_td]:border [&_td]:border-gray-200 [&_td]:p-2 dark:[&_td]:border-gray-700",
-  "[&_th]:border [&_th]:border-gray-200 [&_th]:bg-gray-50 [&_th]:p-2 [&_th]:font-semibold dark:[&_th]:border-gray-700 dark:[&_th]:bg-gray-900",
+  "[&_strong]:font-semibold [&_strong]:text-gray-900 dark:[&_strong]:text-white",
+  "[&_b]:font-semibold [&_b]:text-gray-900 dark:[&_b]:text-white",
+  "[&_em]:italic",
+  "[&_a]:font-medium [&_a]:text-[#e6007e] [&_a]:underline hover:[&_a]:no-underline dark:[&_a]:text-pink-400",
+
+  // Lists
+  "[&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6",
+  "[&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6",
+  "[&_li]:mb-1.5",
+  "[&_li>ul]:mt-1.5 [&_li>ol]:mt-1.5",
+
+  // Media
+  "[&_img]:my-6 [&_img]:mx-auto [&_img]:block [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-xl",
+  "[&_figure]:my-6",
+  "[&_figcaption]:mt-2 [&_figcaption]:text-center [&_figcaption]:text-xs [&_figcaption]:text-gray-500 dark:[&_figcaption]:text-gray-400",
+  "[&_iframe]:my-6 [&_iframe]:max-w-full [&_iframe]:rounded-xl",
+
+  // Quotes + rules
+  "[&_blockquote]:my-5 [&_blockquote]:border-l-4 [&_blockquote]:border-green-500 [&_blockquote]:bg-gray-50 [&_blockquote]:py-3 [&_blockquote]:pl-4 [&_blockquote]:italic dark:[&_blockquote]:bg-gray-900/60",
+  "[&_hr]:my-8 [&_hr]:border-gray-200 dark:[&_hr]:border-gray-700",
+  "[&_mark]:bg-yellow-200 [&_mark]:text-gray-900 dark:[&_mark]:bg-yellow-500/40 dark:[&_mark]:text-yellow-50",
+  "[&_code]:rounded [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-xs dark:[&_code]:bg-gray-900",
+
+  // Tables — sanitizer wraps each one in [data-table-scroll]
+  "[&_[data-table-scroll]]:my-5 [&_[data-table-scroll]]:w-full [&_[data-table-scroll]]:overflow-x-auto",
+  "[&_table]:w-full [&_table]:border-collapse [&_table]:text-xs",
+  "[&_th]:border [&_th]:border-gray-200 [&_th]:bg-gray-50 [&_th]:p-2.5 [&_th]:text-left [&_th]:font-semibold [&_th]:text-gray-900 dark:[&_th]:border-gray-700 dark:[&_th]:bg-gray-900 dark:[&_th]:text-white",
+  "[&_td]:border [&_td]:border-gray-200 [&_td]:p-2.5 [&_td]:align-top [&_td]:text-gray-700 dark:[&_td]:border-gray-700 dark:[&_td]:text-gray-300",
+
+  // CKEditor size classes the sanitizer preserves
+  "[&_.text-tiny]:text-xs [&_.text-small]:text-[0.8125rem] [&_.text-big]:text-base [&_.text-huge]:text-lg",
 ].join(" ");
+
+// ── Images with fallback ────────────────────────────────────────────────────
+
+/** A 404 on /media/ otherwise renders a broken-image icon with the alt text
+ *  sprawled across the layout. */
+function HeroImage({ src, alt }: { src: string | null; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return <div className="h-2 w-full bg-gradient-to-r from-green-600 to-teal-500" />;
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} onError={() => setFailed(true)} className="w-full object-cover" />
+  );
+}
+
+function Thumb({ src }: { src: string | null }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className="h-12 w-12 shrink-0 rounded bg-gradient-to-br from-green-600 to-teal-500" />
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      onError={() => setFailed(true)}
+      className="h-12 w-12 shrink-0 rounded object-cover"
+      loading="lazy"
+    />
+  );
+}
 
 // ── Sidebar widgets ─────────────────────────────────────────────────────────
 
@@ -81,33 +153,24 @@ function RelatedArticles({ posts }: { posts: RelatedPost[] }) {
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Related Articles</h3>
+      <h3 className="mb-4 text-sm font-bold text-gray-900 dark:text-white">Related Articles</h3>
       <ul className="space-y-4">
-        {posts.map((p) => {
-          const img = imageUrl(p.featured_image);
-          return (
-            <li key={p.id} className="flex gap-3">
-              {img && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={img}
-                  alt=""
-                  className="h-12 w-12 shrink-0 rounded object-cover"
-                  loading="lazy"
-                />
-              )}
-              <div className="min-w-0">
-                <Link
-                  href={`/blogs/${p.slug}`}
-                  className="text-xs font-medium leading-snug text-gray-700 hover:text-[#e6007e] dark:text-gray-200"
-                >
-                  {p.title}
-                </Link>
-                <p className="mt-0.5 text-xs text-gray-400">{formatDate(p.created_at)}</p>
-              </div>
-            </li>
-          );
-        })}
+        {posts.map((p) => (
+          <li key={p.id} className="flex gap-3">
+            <Thumb src={imageUrl(p.featured_image)} />
+            <div className="min-w-0">
+              <Link
+                href={`/blogs/${p.slug}`}
+                className="text-xs font-medium leading-snug text-gray-700 hover:text-[#e6007e] dark:text-gray-200 dark:hover:text-pink-400"
+              >
+                {p.title}
+              </Link>
+              <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                {formatDate(p.created_at)}
+              </p>
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   );
@@ -153,7 +216,7 @@ function StayUpdated() {
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <h3 className="mb-1.5 text-sm font-bold text-gray-800 dark:text-white">Stay Updated</h3>
+      <h3 className="mb-1.5 text-sm font-bold text-gray-900 dark:text-white">Stay Updated</h3>
       <p className="mb-3 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
         Get the latest tech news and updates delivered to your inbox.
       </p>
@@ -165,18 +228,22 @@ function StayUpdated() {
           if (e.key === "Enter") subscribe();
         }}
         placeholder="Enter your email"
-        className="mb-2 w-full rounded-md border border-gray-200 px-3 py-2 text-xs placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+        className="mb-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
       />
       <button
         type="button"
         onClick={subscribe}
         disabled={state === "sending" || state === "done"}
-        className="w-full rounded-md bg-gradient-to-r from-green-600 to-teal-500 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        className="w-full rounded-md bg-gradient-to-r from-green-600 to-teal-500 py-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
       >
         {state === "sending" ? "Subscribing..." : state === "done" ? "Subscribed" : "Subscribe"}
       </button>
       {message && (
-        <p className={`mt-2 text-xs ${state === "done" ? "text-green-600" : "text-red-500"}`}>
+        <p
+          className={`mt-2 text-xs ${
+            state === "done" ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"
+          }`}
+        >
           {message}
         </p>
       )}
@@ -187,13 +254,13 @@ function StayUpdated() {
 function NeedHelp() {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <h3 className="mb-1.5 text-sm font-bold text-gray-800 dark:text-white">Need Help?</h3>
+      <h3 className="mb-1.5 text-sm font-bold text-gray-900 dark:text-white">Need Help?</h3>
       <p className="mb-3 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
         Have questions about 5G coverage in your area? Our support team is here to help.
       </p>
       <Link
         href="/contact-us"
-        className="block w-full rounded-md bg-[#e6007e] py-2 text-center text-xs font-semibold text-white transition-colors hover:bg-[#c4007a]"
+        className="block w-full rounded-md bg-[#e6007e] py-2.5 text-center text-xs font-semibold text-white transition-colors hover:bg-[#c4007a]"
       >
         Contact Support
       </Link>
@@ -211,6 +278,12 @@ function BlogDetail() {
   const [related, setRelated] = useState<RelatedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Strip the theme-hostile inline styles once per post, not per render.
+  const cleanHtml = useMemo(
+    () => (post ? sanitizeArticleHtml(post.content) : ""),
+    [post]
+  );
 
   useEffect(() => {
     if (!slug) return;
@@ -242,7 +315,6 @@ function BlogDetail() {
     })();
   }, [slug]);
 
-  // Keep the browser tab title in sync with the post's SEO title.
   useEffect(() => {
     if (post) document.title = post.seo_title || post.title;
   }, [post]);
@@ -263,7 +335,7 @@ function BlogDetail() {
   if (error || !post) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center bg-gray-50 px-4 text-center dark:bg-gray-900">
-        <p className="text-base font-bold text-gray-800 dark:text-white">Post not found</p>
+        <p className="text-base font-bold text-gray-900 dark:text-white">Post not found</p>
         <p className="mt-1 max-w-md text-sm text-gray-500 dark:text-gray-400">
           {error ?? "We couldn't load this article."}
         </p>
@@ -277,13 +349,11 @@ function BlogDetail() {
     );
   }
 
-  const hero = imageUrl(post.featured_image);
-
   return (
     <div className="bg-gray-50 dark:bg-gray-900">
-      {/* Title banner */}
-      <div className="bg-gradient-to-r from-green-600 to-teal-500 px-4 py-12">
-        <div className="mx-auto max-w-6xl">
+      {/* Title banner — min-h stops it collapsing to a thin strip */}
+      <div className="flex min-h-[180px] items-center bg-gradient-to-r from-green-600 to-teal-500 px-4 py-10">
+        <div className="mx-auto w-full max-w-6xl">
           <p className="mb-3 text-xs text-white/80">
             {formatDate(post.created_at)}
             <span className="ml-4">{formatTime(post.created_at)}</span>
@@ -296,21 +366,22 @@ function BlogDetail() {
 
       <div className="mx-auto max-w-6xl px-4 py-10">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
-          {/* Article */}
+          {/* Article — genuinely themed, light and dark both work */}
           <article className="min-w-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            {hero && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={hero} alt={post.title} className="w-full object-cover" />
-            )}
+            <HeroImage src={imageUrl(post.featured_image)} alt={post.title} />
+
             <div className="p-6 sm:p-8">
               <div
-                className={ARTICLE_HTML_CLASSES}
-                dangerouslySetInnerHTML={{ __html: post.content }}
+                className={ARTICLE_CLASSES}
+                dangerouslySetInnerHTML={{ __html: cleanHtml }}
               />
 
               <div className="mt-10 flex items-center justify-between border-t border-gray-100 pt-5 dark:border-gray-700">
-                <p className="text-xs text-gray-400">By {post.author}</p>
-                <Link href="/blogs" className="text-xs font-semibold text-[#e6007e] hover:underline">
+                <p className="text-xs text-gray-400 dark:text-gray-500">By {post.author}</p>
+                <Link
+                  href="/blogs"
+                  className="text-xs font-semibold text-[#e6007e] hover:underline dark:text-pink-400"
+                >
                   Back to all blogs
                 </Link>
               </div>
